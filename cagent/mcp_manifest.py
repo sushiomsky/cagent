@@ -39,6 +39,11 @@ def build_manifest() -> dict[str, Any]:
                 "description": "Run the JSON tool coding agent in a workspace.",
             },
             {
+                "name": "config",
+                "kind": "configuration",
+                "description": "Show resolved runtime configuration without contacting the model endpoint.",
+            },
+            {
                 "name": "init-project",
                 "kind": "project_wizard",
                 "description": "Create project spec, workflow, agents, tasks, tools and hooks.",
