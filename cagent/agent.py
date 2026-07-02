@@ -55,6 +55,8 @@ class CodingAgent:
             allow_shell=config.allow_shell,
             dry_run=config.dry_run,
             shell_timeout_seconds=config.shell_timeout_seconds,
+            command_profile=config.command_profile,
+            auto_approve_shell=config.auto_approve_shell,
         )
 
     def run(self, goal: str) -> AgentRunResult:

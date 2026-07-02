@@ -58,6 +58,30 @@ def test_cli_values_override_environment(tmp_path, monkeypatch):
     assert config.model == "cli-daily"
 
 
+def test_config_selects_command_profile_from_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("CAGENT_COMMAND_PROFILE", "test")
+    monkeypatch.setenv("CAGENT_AUTO_APPROVE_SHELL", "1")
+
+    config = AgentConfig.from_values(workspace=tmp_path)
+
+    assert config.command_profile == "test"
+    assert config.auto_approve_shell is True
+
+
+def test_config_cli_command_policy_overrides_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("CAGENT_COMMAND_PROFILE", "deploy")
+    monkeypatch.setenv("CAGENT_AUTO_APPROVE_SHELL", "1")
+
+    config = AgentConfig.from_values(
+        workspace=tmp_path,
+        command_profile="inspect",
+        auto_approve_shell=False,
+    )
+
+    assert config.command_profile == "inspect"
+    assert config.auto_approve_shell is False
+
+
 def test_model_profile_lines_mark_selected_role():
     lines = ModelProfiles(default="daily", fast="small", reviewer="large").as_lines(
         selected_role="reviewer"

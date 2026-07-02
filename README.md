@@ -21,7 +21,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - no mandatory cloud dependency
 - fast/default/reviewer model profiles
 - workspace-scoped file access
-- guarded shell execution with timeout
+- guarded shell execution with timeout and command profiles
 - repo map and context pack tools
 - patch-based edits via `git apply`
 - git status/diff review tool
@@ -92,14 +92,32 @@ export CAGENT_MODEL=qwen2.5-coder:14b-instruct-q4_K_M
 export CAGENT_FAST_MODEL=qwen2.5-coder:7b-instruct-q4_K_M
 export CAGENT_REVIEWER_MODEL=qwen3-coder:30b-a3b-q4_K_M
 export CAGENT_MODEL_ROLE=default
+export CAGENT_COMMAND_PROFILE=inspect
+export CAGENT_AUTO_APPROVE_SHELL=0
 ```
 
-Choose a profile per run:
+Choose a model profile per run:
 
 ```bash
 cagent run --model-role fast --workspace . --goal "Inspect the repo quickly."
 cagent run --model-role reviewer --workspace . --goal "Review the current diff."
 ```
+
+Choose a shell command policy profile per run:
+
+```bash
+cagent run --shell --command-profile inspect --goal "Inspect git status."
+cagent run --shell --command-profile test --goal "Discover and run tests."
+cagent run --shell --command-profile edit --auto-approve-shell --goal "Format changed files."
+```
+
+Command profiles:
+
+- `inspect`: read-only inspection commands such as `ls`, `rg`, `git status`
+- `test`: inspection plus common test commands such as `pytest`, `npm test`, `go test`
+- `edit`: local write-capable commands require `--auto-approve-shell`
+- `network`: network/dependency commands require `--auto-approve-shell`
+- `deploy`: broadest profile, still blocks absolute safety patterns
 
 Optional run logs:
 
@@ -115,7 +133,7 @@ Logs are written to `.cagent-runs/*.jsonl` and may contain model responses, tool
 cagent doctor --base-url http://127.0.0.1:18080/v1 --model-role default
 ```
 
-The doctor command shows the selected role, selected model, configured profiles and models reported by the endpoint.
+The doctor command shows the selected role, selected model, configured profiles, command profile and models reported by the endpoint.
 
 ## Run
 
@@ -130,6 +148,7 @@ cagent run \
   --workspace . \
   --write \
   --shell \
+  --command-profile test \
   --log-run \
   --goal "Add a small function and run the tests."
 ```
@@ -156,11 +175,11 @@ For non-trivial repos the agent should start with `repo_map` or `context_pack` i
 
 ## Safety model
 
-The agent is not allowed to access files outside the selected workspace. Shell commands run inside the workspace, have a timeout, and pass through a dangerous-command guard before execution.
+The agent is not allowed to access files outside the selected workspace. Shell commands run inside the workspace, have a timeout, and pass through the selected command profile before execution.
 
-Patch application uses `git apply --check` before changing files. File writes and patch application require `--write`. Shell commands require `--shell`.
+Patch application uses `git apply --check` before changing files. File writes and patch application require `--write`. Shell commands require `--shell`. Commands classified as approval-required are blocked unless `--auto-approve-shell` is set after reviewing the command.
 
-This is still a developer tool. Do not run it against production directories or secrets until the approval layer is expanded.
+This is still a developer tool. Do not run it against production directories or secrets until the approval layer is expanded further.
 
 ## Roadmap
 
@@ -176,5 +195,5 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] test command discovery
 - [x] repo map and context packer
 - [x] model router: fast/default/reviewer
-- [ ] approval prompts for risky actions
+- [x] approval and command profiles for shell actions
 - [ ] OpenWebUI/Codex integration docs

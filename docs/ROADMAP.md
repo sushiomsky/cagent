@@ -32,7 +32,7 @@ Status: implemented in `phase3/repo-map-context` and merged.
 
 ## Phase 4: Model router
 
-Status: implemented in `phase4/model-router`.
+Status: implemented in `phase4/model-router` and merged.
 
 - Add default, fast and reviewer model profiles.
 - Add CLI flags and environment variables for model roles.
@@ -42,10 +42,13 @@ Status: implemented in `phase4/model-router`.
 
 ## Phase 5: Approval and safety
 
-- Add interactive approval for risky shell commands.
-- Add command profiles: inspect, test, edit, network, deploy.
-- Add secret detection before sending context to the model.
-- Add read-only mode as the default for unknown workspaces.
+Status: implemented in `phase5/approval-safety`.
+
+- Add command policy profiles: inspect, test, edit, network, deploy.
+- Block commands outside the selected profile.
+- Require explicit `--auto-approve-shell` for approval-required commands.
+- Keep absolute safety patterns blocked even in deploy profile.
+- Add CLI/env configuration, tests and documentation.
 
 ## Phase 6: Integrations
 
