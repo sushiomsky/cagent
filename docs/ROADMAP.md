@@ -2,7 +2,7 @@
 
 ## Phase 1: MVP agent loop
 
-Status: implemented in `bootstrap/mvp-agent`.
+Status: implemented in `bootstrap/mvp-agent` and merged.
 
 - CLI entrypoint
 - OpenAI-compatible model client
@@ -13,11 +13,13 @@ Status: implemented in `bootstrap/mvp-agent`.
 
 ## Phase 2: Better code editing
 
+Status: implemented in `phase2/patch-diff-logs`.
+
 - Add an `apply_patch` tool instead of rewriting full files for every edit.
 - Add a structured `git_diff` tool.
 - Add automatic test command discovery.
-- Add formatting/lint command discovery.
 - Add run logs in `.cagent-runs/`.
+- Document the new tools and add coverage.
 
 ## Phase 3: Context packing
 
