@@ -42,7 +42,7 @@ Status: implemented in `phase4/model-router` and merged.
 
 ## Phase 5: Approval and safety
 
-Status: implemented in `phase5/approval-safety`.
+Status: implemented in `phase5/approval-safety` and merged.
 
 - Add command policy profiles: inspect, test, edit, network, deploy.
 - Block commands outside the selected profile.
@@ -52,7 +52,16 @@ Status: implemented in `phase5/approval-safety`.
 
 ## Phase 6: Integrations
 
-- OpenWebUI tool/server mode.
-- Codex/OpenCode-compatible endpoint documentation.
-- Tailscale/Ollama deployment guide for Tesla T4 workers.
+Status: implemented in `phase6/docs`.
+
+- Add client integration guide for cagent, OpenAI-compatible clients and OpenWebUI.
+- Add Tesla T4 + Tailscale + Ollama deployment guide.
+- Document local endpoint conventions, model profiles and smoke tests.
+- Link integration docs from the README.
+
+## Phase 7: Future improvements
+
 - Simple web UI for run logs and approvals.
+- Secret detection before context is sent to the model.
+- Workspace trust model for first-run safety.
+- Optional language-specific repo map parsers.
