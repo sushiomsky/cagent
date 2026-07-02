@@ -245,6 +245,8 @@ def add_common_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--model-role", choices=VALID_MODEL_ROLES)
     parser.add_argument("--temperature", type=float)
     parser.add_argument("--request-timeout", type=int)
+    parser.add_argument("--request-retries", type=int)
+    parser.add_argument("--retry-backoff-seconds", type=float)
     parser.add_argument("--shell-timeout", type=int)
 
 
@@ -264,6 +266,8 @@ def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -
         workspace=workspace,
         temperature=args.temperature,
         request_timeout_seconds=args.request_timeout,
+        request_retries=args.request_retries,
+        retry_backoff_seconds=args.retry_backoff_seconds,
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
@@ -279,11 +283,19 @@ def run_doctor(args: argparse.Namespace) -> int:
     print(f"model:           {config.model}")
     print(f"fast_model:      {config.model_profiles.fast}")
     print(f"reviewer_model:  {config.model_profiles.reviewer}")
+    print(f"request_retries: {config.request_retries}")
+    print(f"retry_backoff:   {config.retry_backoff_seconds}")
     print(f"command_profile: {config.command_profile}")
     print(f"redact_secrets:  {config.redact_secrets}")
     print(format_trust_status(config.workspace))
     try:
-        models = OpenAICompatibleClient(base_url=config.base_url, model=config.model, timeout_seconds=config.request_timeout_seconds).list_models()
+        models = OpenAICompatibleClient(
+            base_url=config.base_url,
+            model=config.model,
+            timeout_seconds=config.request_timeout_seconds,
+            retries=config.request_retries,
+            retry_backoff_seconds=config.retry_backoff_seconds,
+        ).list_models()
     except LLMError as exc:
         print(f"models:          unavailable ({exc})")
         return 1
@@ -311,6 +323,8 @@ def run_agent(args: argparse.Namespace) -> int:
         max_tokens=args.max_tokens,
         max_steps=args.max_steps,
         request_timeout_seconds=args.request_timeout,
+        request_retries=args.request_retries,
+        retry_backoff_seconds=args.retry_backoff_seconds,
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
@@ -379,6 +393,8 @@ def run_project_loop(args: argparse.Namespace) -> int:
         max_steps=args.max_steps,
         temperature=args.temperature,
         request_timeout_seconds=args.request_timeout,
+        request_retries=args.request_retries,
+        retry_backoff_seconds=args.retry_backoff_seconds,
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
@@ -424,7 +440,13 @@ def run_tool(args: argparse.Namespace) -> int:
 
 
 def run_research(args: argparse.Namespace) -> int:
-    path = add_research_note(Path(args.workspace).resolve(), topic=args.topic, source=args.source, summary=args.summary, decision=args.decision)
+    path = add_research_note(
+        Path(args.workspace).resolve(),
+        topic=args.topic,
+        source=args.source,
+        summary=args.summary,
+        decision=args.decision,
+    )
     print(f"research note: {path}")
     return 0
 
