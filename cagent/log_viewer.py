@@ -51,6 +51,30 @@ def read_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def summary_to_dict(summary: RunLogSummary) -> dict[str, Any]:
+    return {
+        "path": str(summary.path),
+        "name": summary.path.name,
+        "run_id": summary.run_id,
+        "goal": summary.goal,
+        "model": summary.model,
+        "model_role": summary.model_role,
+        "events": summary.events,
+        "finished": summary.finished,
+    }
+
+
+def summaries_json(paths: list[Path]) -> str:
+    summaries = [summary_to_dict(summarize_run_log(path)) for path in paths]
+    return json.dumps(summaries, indent=2, sort_keys=True) + "\n"
+
+
+def events_json(path: Path, *, max_events: int = 50) -> str:
+    events = read_events(path)
+    selected = events[-max_events:]
+    return json.dumps(selected, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+
+
 def format_summary(summary: RunLogSummary) -> str:
     status = "finished" if summary.finished else "open"
     return (
