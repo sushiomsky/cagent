@@ -20,6 +20,7 @@ dev = [
 
 [project.scripts]
 cagent = "cagent.cli:main"
+cagent-logs-json = "cagent.log_json_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
