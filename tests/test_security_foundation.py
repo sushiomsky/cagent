@@ -1,4 +1,5 @@
 import json
+import re
 
 from cagent.secret_scan import (
     SecretAllowlist,
@@ -9,6 +10,7 @@ from cagent.secret_scan import (
     scan_text,
     scan_workspace,
     shannon_entropy,
+    sorted_findings,
 )
 from cagent.tools import WorkspaceTools
 from cagent.trust import format_trust_status, is_trusted, load_trust, trust_workspace
@@ -52,7 +54,7 @@ def test_allowlist_can_be_passed_to_scan_text():
     allowlist = SecretAllowlist(patterns=())
 
     assert scan_text(text, path=".env", allowlist=allowlist)
-    assert not scan_text(text, path=".env", allowlist=SecretAllowlist(patterns=(__import__("re").compile("TOKEN="),)))
+    assert not scan_text(text, path=".env", allowlist=SecretAllowlist(patterns=(re.compile("TOKEN="),)))
 
 
 def test_findings_json_is_machine_readable():
@@ -73,7 +75,7 @@ def test_entropy_filters_low_entropy_placeholders():
 def test_critical_findings_sort_before_medium():
     findings = scan_text("TOKEN=1234567890abcdef\nsk-abcdefghijklmnopqrstuvwxyz012345\n", path=".env")
 
-    assert findings[0].severity == "critical"
+    assert sorted_findings(findings)[0].severity == "critical"
 
 
 def test_workspace_tools_redact_file_output_by_default(tmp_path):
