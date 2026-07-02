@@ -13,4 +13,16 @@ The client supports:
 
 Retryable cases include temporary connection failures, timeouts and selected transient HTTP status codes.
 
+## Configuration
+
+The default transport behavior is configured through `AgentConfig` and environment variables:
+
+```text
+CAGENT_REQUEST_TIMEOUT_SECONDS=120
+CAGENT_REQUEST_RETRIES=1
+CAGENT_RETRY_BACKOFF_SECONDS=0.5
+```
+
+`CAGENT_REQUEST_RETRIES` is the number of retries after the first attempt. `CAGENT_RETRY_BACKOFF_SECONDS` is the base delay used before retrying.
+
 The default client remains dependency-free and keeps existing cagent behavior unchanged, except that temporary endpoint interruptions now get one automatic retry.
