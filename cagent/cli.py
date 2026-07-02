@@ -29,6 +29,7 @@ from cagent.project_engine import (
 from cagent.secret_scan import format_findings, scan_workspace
 from cagent.stdio_server import serve_stdio
 from cagent.trust import format_trust_status, trust_workspace
+from cagent.web_ui import DEFAULT_HOST, DEFAULT_PORT, serve_web_ui
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -64,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_trust(args)
         if args.command == "serve-stdio":
             return serve_stdio()
+        if args.command == "serve-web":
+            return serve_web_ui(workspace=Path(args.workspace), host=args.host, port=args.port)
         if args.command == "mcp-manifest":
             return run_mcp_manifest()
     except (LLMError, AgentProtocolError, ValueError, OSError) as exc:
@@ -173,6 +176,11 @@ def build_parser() -> argparse.ArgumentParser:
     trust.add_argument("--workspace", default=".")
     trust.add_argument("--status", action="store_true", help="Only print trust status.")
     trust.add_argument("--reason", default="User explicitly trusted this workspace.")
+
+    serve_web = subparsers.add_parser("serve-web", help="Run the local dependency-free cagent web UI.")
+    serve_web.add_argument("--workspace", default=".")
+    serve_web.add_argument("--host", default=DEFAULT_HOST)
+    serve_web.add_argument("--port", type=int, default=DEFAULT_PORT)
 
     subparsers.add_parser("serve-stdio", help="Run the local line-delimited JSON-RPC stdio adapter.")
     subparsers.add_parser("mcp-manifest", help="Print a JSON manifest of cagent capabilities.")
