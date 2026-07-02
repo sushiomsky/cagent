@@ -40,6 +40,13 @@ class ToolDefinition:
     input_schema: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class PromptDefinition:
+    name: str
+    description: str
+    text: str
+
+
 TOOLS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="cagent.resume",
@@ -105,6 +112,24 @@ TOOLS: tuple[ToolDefinition, ...] = (
     ),
 )
 
+PROMPTS: tuple[PromptDefinition, ...] = (
+    PromptDefinition(
+        name="cagent.planner",
+        description="Plan the next small project step from current cagent state.",
+        text="Read the project spec, tasks and snapshot. Pick the smallest useful next step and explain the expected verification.",
+    ),
+    PromptDefinition(
+        name="cagent.researcher",
+        description="Turn gathered notes into a short decision-oriented summary.",
+        text="Review the available project notes and summarize options, constraints, risks and a recommended next decision.",
+    ),
+    PromptDefinition(
+        name="cagent.reviewer",
+        description="Review a project change for correctness, risk and missing checks.",
+        text="Review the current project state. Identify correctness issues, missing tests, documentation gaps and safe next actions.",
+    ),
+)
+
 
 class RpcError(RuntimeError):
     def __init__(self, code: int, message: str, data: Any | None = None) -> None:
@@ -164,6 +189,10 @@ def handle_request(request: Any) -> dict[str, Any] | None:
             result = {"resources": list_resources(params)}
         elif method == "resources/read":
             result = read_resource(params)
+        elif method == "prompts/list":
+            result = {"prompts": [prompt_to_dict(prompt) for prompt in PROMPTS]}
+        elif method == "prompts/get":
+            result = get_prompt(params)
         elif method == "shutdown":
             result = {"shutdown": True}
         else:
@@ -179,8 +208,12 @@ def handle_request(request: Any) -> dict[str, Any] | None:
 def initialize_result() -> dict[str, Any]:
     return {
         "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-        "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False}},
-        "instructions": "Use tools/list, tools/call, resources/list and resources/read for conservative cagent project-state access.",
+        "capabilities": {
+            "tools": {"listChanged": False},
+            "resources": {"listChanged": False},
+            "prompts": {"listChanged": False},
+        },
+        "instructions": "Use tools, resources and prompts for conservative cagent project-state access.",
     }
 
 
@@ -245,12 +278,29 @@ def read_resource(params: dict[str, Any]) -> dict[str, Any]:
     return {"contents": [{"uri": uri, "mimeType": _mime_type(path), "text": text}]}
 
 
+def get_prompt(params: dict[str, Any]) -> dict[str, Any]:
+    name = params.get("name")
+    if not isinstance(name, str):
+        raise RpcError(-32602, "prompts/get requires string field: name")
+    for prompt in PROMPTS:
+        if prompt.name == name:
+            return {
+                "description": prompt.description,
+                "messages": [{"role": "user", "content": {"type": "text", "text": prompt.text}}],
+            }
+    raise RpcError(-32602, f"unknown prompt: {name}")
+
+
 def tool_to_dict(tool: ToolDefinition) -> dict[str, Any]:
     return {
         "name": tool.name,
         "description": tool.description,
         "inputSchema": tool.input_schema,
     }
+
+
+def prompt_to_dict(prompt: PromptDefinition) -> dict[str, Any]:
+    return {"name": prompt.name, "description": prompt.description, "arguments": []}
 
 
 def error_response(request_id: Any, code: int, message: str, data: Any | None = None) -> dict[str, Any]:
