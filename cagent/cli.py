@@ -16,6 +16,7 @@ from cagent.approval_queue import (
     list_approval_requests,
     update_approval_status,
 )
+from cagent.approval_runner import build_approval_run_plans, format_run_plans, mark_approval_handled, run_plans_json
 from cagent.command_policy import VALID_COMMAND_PROFILES
 from cagent.config import AgentConfig
 from cagent.llm import LLMError, OpenAICompatibleClient
@@ -201,8 +202,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     approval_list = approval_sub.add_parser("list", help="List approval requests.")
     approval_list.add_argument("--workspace", default=".")
-    approval_list.add_argument("--status", choices=("pending", "approved", "rejected", "all"), default="pending")
+    approval_list.add_argument("--status", choices=("pending", "approved", "rejected", "handled", "all"), default="pending")
     approval_list.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+
+    approval_plan = approval_sub.add_parser("plan", help="Show non-executing handling plans for approved requests.")
+    approval_plan.add_argument("--workspace", default=".")
+    approval_plan.add_argument("--id", help="Optional approval request id. Defaults to all approved requests.")
+    approval_plan.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
     approval_approve = approval_sub.add_parser("approve", help="Mark an approval request as approved.")
     approval_approve.add_argument("--workspace", default=".")
@@ -213,6 +219,11 @@ def build_parser() -> argparse.ArgumentParser:
     approval_reject.add_argument("--workspace", default=".")
     approval_reject.add_argument("id")
     approval_reject.add_argument("--note", default="")
+
+    approval_handled = approval_sub.add_parser("handled", help="Mark an approved request as handled after review.")
+    approval_handled.add_argument("--workspace", default=".")
+    approval_handled.add_argument("id")
+    approval_handled.add_argument("--note", default="Handled after review.")
 
     serve_web = subparsers.add_parser("serve-web", help="Run the local dependency-free cagent web UI.")
     serve_web.add_argument("--workspace", default=".")
@@ -516,6 +527,10 @@ def run_approval(args: argparse.Namespace) -> int:
         requests = list_approval_requests(workspace, status=args.status)
         print(approvals_json(requests) if args.json else format_approval_requests(requests))
         return 0
+    if command == "plan":
+        plans = build_approval_run_plans(workspace, request_id=args.id)
+        print(run_plans_json(plans) if args.json else format_run_plans(plans))
+        return 0
     if command == "approve":
         request = update_approval_status(workspace, args.id, status="approved", response_note=args.note)
         print(format_approval_requests([request]))
@@ -524,7 +539,11 @@ def run_approval(args: argparse.Namespace) -> int:
         request = update_approval_status(workspace, args.id, status="rejected", response_note=args.note)
         print(format_approval_requests([request]))
         return 0
-    print("error: approval requires one of: request, list, approve, reject", file=sys.stderr)
+    if command == "handled":
+        request = mark_approval_handled(workspace, args.id, note=args.note)
+        print(format_approval_requests([request]))
+        return 0
+    print("error: approval requires one of: request, list, plan, approve, reject, handled", file=sys.stderr)
     return 2
 
 
