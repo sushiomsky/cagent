@@ -22,6 +22,7 @@ class AgentConfig:
     allow_write: bool = False
     allow_shell: bool = False
     dry_run: bool = False
+    log_run: bool = False
 
     @classmethod
     def from_values(
@@ -38,6 +39,7 @@ class AgentConfig:
         allow_write: bool = False,
         allow_shell: bool = False,
         dry_run: bool = False,
+        log_run: bool | None = None,
     ) -> "AgentConfig":
         """Build config from CLI values and environment defaults."""
 
@@ -64,4 +66,12 @@ class AgentConfig:
             allow_write=allow_write,
             allow_shell=allow_shell,
             dry_run=dry_run,
+            log_run=_env_flag("CAGENT_LOG_RUNS", False) if log_run is None else log_run,
         )
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}

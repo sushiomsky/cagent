@@ -21,6 +21,9 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - no mandatory cloud dependency
 - workspace-scoped file access
 - guarded shell execution with timeout
+- patch-based edits via `git apply`
+- git status/diff review tool
+- optional local JSONL run logs
 - JSON action loop instead of hidden magic
 - copy-paste friendly CLI
 - works with Ollama's OpenAI-compatible API
@@ -72,6 +75,14 @@ export CAGENT_BASE_URL=http://127.0.0.1:18080/v1
 export CAGENT_MODEL=qwen2.5-coder:14b-instruct-q4_K_M
 ```
 
+Optional run logs:
+
+```bash
+export CAGENT_LOG_RUNS=1
+```
+
+Logs are written to `.cagent-runs/*.jsonl` and may contain model responses, tool arguments and tool output.
+
 ## Doctor
 
 ```bash
@@ -84,19 +95,36 @@ cagent doctor --base-url http://127.0.0.1:18080/v1 --model qwen2.5-coder:14b-ins
 cagent run --workspace . --goal "Inspect this repo and tell me the next implementation step."
 ```
 
-With file writes and shell enabled:
+With file writes, shell and run logs enabled:
 
 ```bash
 cagent run \
   --workspace . \
   --write \
   --shell \
+  --log-run \
   --goal "Add a small function and run the tests."
 ```
+
+## Agent tools
+
+The model can request these tools through the JSON action loop:
+
+- `list_files`: list workspace files
+- `read_file`: read a UTF-8 file with optional line range
+- `write_file`: write or replace a UTF-8 file
+- `apply_patch`: apply a unified diff through `git apply`
+- `search_text`: regex/text search in workspace files
+- `git_diff`: show `git status --short` and `git diff`
+- `discover_tests`: suggest likely test commands
+- `run_shell`: run guarded shell commands when `--shell` is enabled
+- `finish`: end the run
 
 ## Safety model
 
 The agent is not allowed to access files outside the selected workspace. Shell commands run inside the workspace, have a timeout, and pass through a dangerous-command guard before execution.
+
+Patch application uses `git apply --check` before changing files. File writes and patch application require `--write`. Shell commands require `--shell`.
 
 This is still a developer tool. Do not run it against production directories or secrets until the approval layer is expanded.
 
@@ -108,9 +136,11 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] shell tool with timeout and guardrails
 - [x] doctor command
 - [x] tests and CI
-- [ ] proper patch tool
+- [x] proper patch tool
+- [x] git diff review tool
+- [x] optional run logs
+- [x] test command discovery
 - [ ] model router: fast/default/reviewer
 - [ ] approval prompts for risky actions
 - [ ] repo map and context packer
-- [ ] persistent run logs
 - [ ] OpenWebUI/Codex integration docs

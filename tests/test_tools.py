@@ -1,14 +1,15 @@
+import subprocess
 from pathlib import Path
 
 from cagent.tools import WorkspaceTools
 
 
-def make_tools(tmp_path: Path, *, write: bool = True, shell: bool = False) -> WorkspaceTools:
+def make_tools(tmp_path: Path, *, write: bool = True, shell: bool = False, dry_run: bool = False) -> WorkspaceTools:
     return WorkspaceTools(
         workspace=tmp_path,
         allow_write=write,
         allow_shell=shell,
-        dry_run=False,
+        dry_run=dry_run,
         shell_timeout_seconds=5,
     )
 
@@ -31,6 +32,52 @@ def test_rejects_workspace_escape(tmp_path):
     result = tools.write_file(path="../escape.txt", content="nope")
     assert not result.ok
     assert "escapes workspace" in result.output
+
+
+def test_apply_patch_changes_existing_file(tmp_path):
+    tools = make_tools(tmp_path, write=True)
+    (tmp_path / "a.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+
+    result = tools.apply_patch(
+        patch="""--- a/a.txt
++++ b/a.txt
+@@ -1,2 +1,2 @@
+ alpha
+-beta
++gamma
+"""
+    )
+
+    assert result.ok
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "alpha\ngamma\n"
+
+
+def test_apply_patch_check_only_does_not_write(tmp_path):
+    tools = make_tools(tmp_path, write=True)
+    (tmp_path / "a.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+
+    result = tools.apply_patch(
+        patch="""--- a/a.txt
++++ b/a.txt
+@@ -1,2 +1,2 @@
+ alpha
+-beta
++gamma
+""",
+        check_only=True,
+    )
+
+    assert result.ok
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "alpha\nbeta\n"
+
+
+def test_apply_patch_requires_write_when_not_check_only(tmp_path):
+    tools = make_tools(tmp_path, write=False)
+
+    result = tools.apply_patch(patch="--- a/a.txt\n+++ b/a.txt\n")
+
+    assert not result.ok
+    assert "disabled" in result.output
 
 
 def test_shell_disabled_by_default(tmp_path):
@@ -56,3 +103,24 @@ def test_search_text(tmp_path):
     result = tools.search_text(pattern="beta")
     assert result.ok
     assert "a.txt:2: beta" in result.output
+
+
+def test_git_diff_reports_status(tmp_path):
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    tools = make_tools(tmp_path)
+    (tmp_path / "a.txt").write_text("alpha\n", encoding="utf-8")
+
+    result = tools.git_diff()
+
+    assert result.ok
+    assert "?? a.txt" in result.output
+
+
+def test_discover_tests_for_python_project(tmp_path):
+    tools = make_tools(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'demo'\n", encoding="utf-8")
+
+    result = tools.discover_tests()
+
+    assert result.ok
+    assert "pytest -q" in result.output

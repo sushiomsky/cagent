@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from cagent.config import AgentConfig
 from cagent.llm import ChatMessage, OpenAICompatibleClient
 from cagent.prompts import SYSTEM_PROMPT, build_goal_prompt
-from cagent.tools import ToolResult, WorkspaceTools
+from cagent.runlog import RunLogger
+from cagent.tools import WorkspaceTools
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ class AgentRunResult:
 
     final_message: str
     steps: list[AgentStep]
+    log_path: Path | None = None
 
 
 class AgentProtocolError(RuntimeError):
@@ -57,6 +60,16 @@ class CodingAgent:
     def run(self, goal: str) -> AgentRunResult:
         """Run the agent until it calls `finish` or reaches the step limit."""
 
+        logger = (
+            RunLogger(
+                workspace=self.config.workspace,
+                goal=goal,
+                model=self.config.model,
+                base_url=self.config.base_url,
+            )
+            if self.config.log_run
+            else None
+        )
         messages = [
             ChatMessage("system", SYSTEM_PROMPT),
             ChatMessage("user", build_goal_prompt(goal)),
@@ -69,6 +82,9 @@ class CodingAgent:
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
             )
+            if logger:
+                logger.record("model_response", {"step": index, "raw_response": raw_response})
+
             action = parse_action(raw_response)
             tool = str(action.get("tool", "")).strip()
             args = action.get("args") or {}
@@ -79,23 +95,44 @@ class CodingAgent:
 
             if tool == "finish":
                 message = str(args.get("message", "Done."))
-                return AgentRunResult(final_message=message, steps=steps)
+                if logger:
+                    logger.record("finish", {"step": index, "message": message})
+                return AgentRunResult(
+                    final_message=message,
+                    steps=steps,
+                    log_path=logger.path if logger else None,
+                )
 
             result = self.tools.execute(tool, args)
-            steps.append(
-                AgentStep(
-                    index=index,
-                    tool=tool,
-                    note=note,
-                    ok=result.ok,
-                    output=result.output,
-                )
+            step = AgentStep(
+                index=index,
+                tool=tool,
+                note=note,
+                ok=result.ok,
+                output=result.output,
             )
+            steps.append(step)
+            if logger:
+                logger.record(
+                    "tool_result",
+                    {
+                        "step": index,
+                        "action": action,
+                        "ok": result.ok,
+                        "output": result.output,
+                    },
+                )
             messages.append(ChatMessage("assistant", json.dumps(action, ensure_ascii=False)))
             messages.append(ChatMessage("user", result.as_message()))
 
         final = "Maximum agent steps reached. Re-run with --max-steps if more work is needed."
-        return AgentRunResult(final_message=final, steps=steps)
+        if logger:
+            logger.record("finish", {"step": self.config.max_steps, "message": final})
+        return AgentRunResult(
+            final_message=final,
+            steps=steps,
+            log_path=logger.path if logger else None,
+        )
 
 
 def parse_action(raw_response: str) -> dict[str, Any]:

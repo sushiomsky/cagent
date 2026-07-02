@@ -21,6 +21,7 @@ SKIPPED_DIRS = {
     ".pytest_cache",
     ".ruff_cache",
     ".mypy_cache",
+    ".cagent-runs",
     "dist",
     "build",
 }
@@ -89,12 +90,24 @@ class WorkspaceTools:
                     content=str(args.get("content", "")),
                     overwrite=bool(args.get("overwrite", True)),
                 )
+            if tool == "apply_patch":
+                return self.apply_patch(
+                    patch=str(args["patch"]),
+                    check_only=bool(args.get("check_only", False)),
+                )
             if tool == "search_text":
                 return self.search_text(
                     pattern=str(args["pattern"]),
                     path=str(args.get("path", ".")),
                     max_results=int(args.get("max_results", 50)),
                 )
+            if tool == "git_diff":
+                return self.git_diff(
+                    path=str(args.get("path", ".")),
+                    max_chars=int(args.get("max_chars", 40_000)),
+                )
+            if tool == "discover_tests":
+                return self.discover_tests()
             if tool == "run_shell":
                 return self.run_shell(command=str(args["command"]))
         except KeyError as exc:
@@ -171,6 +184,29 @@ class WorkspaceTools:
         full_path.write_text(content, encoding="utf-8")
         return ToolResult(True, f"Wrote {len(content)} bytes to {path}")
 
+    def apply_patch(self, *, patch: str, check_only: bool = False) -> ToolResult:
+        """Apply a unified diff through `git apply`.
+
+        Using Git here is intentional: it handles hunk offsets, mode changes and
+        path normalization better than a fragile hand-rolled patch parser.
+        """
+
+        if not patch.strip():
+            return ToolResult(False, "Patch is empty.")
+        if not check_only and not self.allow_write:
+            return ToolResult(False, "Patch application is disabled. Re-run with --write to allow changes.")
+
+        check = self._run_git_apply(["git", "apply", "--check", "--whitespace=nowarn"], patch)
+        if check.returncode != 0:
+            return ToolResult(False, _format_completed_process(check))
+
+        if check_only or self.dry_run:
+            prefix = "Dry-run: " if self.dry_run and not check_only else ""
+            return ToolResult(True, f"{prefix}patch check passed; no files were changed.")
+
+        applied = self._run_git_apply(["git", "apply", "--whitespace=nowarn"], patch)
+        return ToolResult(applied.returncode == 0, _format_completed_process(applied))
+
     def search_text(self, *, pattern: str, path: str = ".", max_results: int = 50) -> ToolResult:
         root = self.resolve_path(path)
         if not root.exists():
@@ -183,7 +219,8 @@ class WorkspaceTools:
         for file_path in files:
             relative = file_path.relative_to(self.workspace)
             try:
-                for line_no, line in enumerate(file_path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+                text = file_path.read_text(encoding="utf-8", errors="replace")
+                for line_no, line in enumerate(text.splitlines(), start=1):
                     if regex.search(line):
                         results.append(f"{relative}:{line_no}: {line}")
                         if len(results) >= max_results:
@@ -192,6 +229,52 @@ class WorkspaceTools:
                 results.append(f"{relative}: could not read: {exc}")
 
         return ToolResult(True, "\n".join(results) if results else "No matches.")
+
+    def git_diff(self, *, path: str = ".", max_chars: int = 40_000) -> ToolResult:
+        resolved = self.resolve_path(path)
+        relative = "." if resolved == self.workspace else str(resolved.relative_to(self.workspace))
+        status = _run_command(
+            ["git", "status", "--short", "--untracked-files=all", "--", relative],
+            cwd=self.workspace,
+            timeout_seconds=self.shell_timeout_seconds,
+            input_text=None,
+        )
+        diff = _run_command(
+            ["git", "diff", "--", relative],
+            cwd=self.workspace,
+            timeout_seconds=self.shell_timeout_seconds,
+            input_text=None,
+        )
+        if status.returncode != 0:
+            return ToolResult(False, _format_completed_process(status))
+        if diff.returncode != 0:
+            return ToolResult(False, _format_completed_process(diff))
+
+        output = f"--- git status --short ---\n{status.stdout}\n--- git diff ---\n{diff.stdout}"
+        if len(output) > max_chars:
+            output = output[:max_chars] + "\n... truncated ..."
+        return ToolResult(True, output)
+
+    def discover_tests(self) -> ToolResult:
+        candidates: list[str] = []
+        if (self.workspace / "pyproject.toml").exists() or (self.workspace / "pytest.ini").exists():
+            candidates.append("pytest -q")
+        if (self.workspace / "package.json").exists():
+            candidates.append("npm test")
+        if (self.workspace / "pnpm-lock.yaml").exists():
+            candidates.insert(0, "pnpm test")
+        if (self.workspace / "yarn.lock").exists():
+            candidates.insert(0, "yarn test")
+        if (self.workspace / "go.mod").exists():
+            candidates.append("go test ./...")
+        if (self.workspace / "Cargo.toml").exists():
+            candidates.append("cargo test")
+        if (self.workspace / "composer.json").exists():
+            candidates.append("composer test")
+
+        if not candidates:
+            return ToolResult(True, "No obvious test command found.")
+        return ToolResult(True, "Suggested test commands:\n" + "\n".join(f"- {item}" for item in candidates))
 
     def run_shell(self, *, command: str) -> ToolResult:
         if not self.allow_shell:
@@ -211,14 +294,18 @@ class WorkspaceTools:
             env=_safe_env(),
             check=False,
         )
-        output = (
-            f"exit_code={completed.returncode}\n"
-            f"--- stdout ---\n{completed.stdout}\n"
-            f"--- stderr ---\n{completed.stderr}"
-        )
+        output = _format_completed_process(completed)
         if len(output) > 40_000:
             output = output[:40_000] + "\n... truncated ..."
         return ToolResult(completed.returncode == 0, output)
+
+    def _run_git_apply(self, command: list[str], patch: str) -> subprocess.CompletedProcess[str]:
+        return _run_command(
+            command,
+            cwd=self.workspace,
+            timeout_seconds=self.shell_timeout_seconds,
+            input_text=patch,
+        )
 
 
 def _iter_text_files(root: Path) -> list[Path]:
@@ -242,6 +329,33 @@ def _is_probably_text_file(path: Path) -> bool:
 
 def _looks_dangerous(command: str) -> bool:
     return any(re.search(pattern, command) for pattern in DANGEROUS_COMMAND_PATTERNS)
+
+
+def _run_command(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int,
+    input_text: str | None,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        input=input_text,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        env=_safe_env(),
+        check=False,
+    )
+
+
+def _format_completed_process(completed: subprocess.CompletedProcess[str]) -> str:
+    return (
+        f"exit_code={completed.returncode}\n"
+        f"--- stdout ---\n{completed.stdout}\n"
+        f"--- stderr ---\n{completed.stderr}"
+    )
 
 
 def _safe_env() -> dict[str, str]:
