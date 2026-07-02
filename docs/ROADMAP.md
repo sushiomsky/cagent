@@ -144,16 +144,25 @@ Status: implemented in `phase16/secret-quality` and merged.
 
 ## Phase 17: Approval queue
 
-Status: implemented in `phase17/approval-queue`.
+Status: implemented in `phase17/approval-queue` and merged.
 
 - Add durable `.cagent/approvals.jsonl` storage.
 - Add `cagent approval request/list/approve/reject`.
 - Add text and JSON output for approvals.
 - Add docs, manifest entry and tests.
 
-## Phase 18: Future improvements
+## Phase 18: Approval integration
+
+Status: implemented in `phase18/approval-integration`.
+
+- Make review-required tool policy decisions automatically create queue entries.
+- Return the approval request ID to the agent loop.
+- Add safer process invocation behavior for reviewed local tool actions.
+- Add docs and tests.
+
+## Phase 19: Future improvements
 
 - Full SDK-backed MCP server mode.
 - Optional language-specific repo map parsers.
-- Make command policy approval decisions automatically create queue entries.
 - Add web UI approval review surface.
+- Add reviewed runner for approved queue items.
