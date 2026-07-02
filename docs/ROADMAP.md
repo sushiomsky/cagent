@@ -201,7 +201,7 @@ Status: implemented in `phase22/quality-gates` and merged.
 
 ## Phase 23: Python AST repo map
 
-Status: implemented in `phase23/python-ast-repomap`.
+Status: implemented in `phase23/python-ast-repomap` and merged.
 
 - Use Python's standard-library `ast` parser for `.py` files.
 - Add symbol line ranges for classes, functions and methods.
@@ -209,8 +209,18 @@ Status: implemented in `phase23/python-ast-repomap`.
 - Include symbol line-range hints in repo map and context-pack output.
 - Add tests for AST symbols, methods, imports and context-pack metadata.
 
-## Phase 24: Future improvements
+## Phase 24: Action validation and repair
+
+Status: implemented in `phase24/action-validation`.
+
+- Add schema validation for model tool actions.
+- Validate known tools, required arguments, argument types and unsupported arguments.
+- Add a bounded repair loop for invalid model actions.
+- Log repair attempts when run logging is enabled.
+- Add action protocol documentation and tests.
+
+## Phase 25: Future improvements
 
 - Full SDK-backed MCP server mode.
-- Agent action schema validation and repair loop.
+- Loop-until-done project execution state.
 - Add more narrow reviewed status workflows.
