@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from cagent.approval_queue import list_approval_requests, update_approval_status
 from cagent.log_viewer import format_events, list_run_logs, summarize_run_log
 from cagent.project_engine import load_project, load_tasks, next_action, verify_project, write_final_report
 from cagent.secret_scan import scan_workspace
@@ -75,6 +76,16 @@ class CagentWebHandler(BaseHTTPRequestHandler):
             write_final_report(self.workspace, notes=notes)
             self._redirect("/")
             return
+        if parsed.path == "/actions/approval":
+            request_id = data.get("id", [""])[0]
+            action = data.get("action", [""])[0]
+            note = data.get("note", ["Reviewed from cagent web UI."])[0]
+            if action not in {"approved", "rejected"}:
+                self._send_text("invalid approval action", status=HTTPStatus.BAD_REQUEST)
+                return
+            update_approval_status(self.workspace, request_id, status=action, response_note=note)
+            self._redirect("/")
+            return
         self._send_text("not found", status=HTTPStatus.NOT_FOUND)
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature.
@@ -127,6 +138,7 @@ def status_payload(workspace: Path) -> dict[str, Any]:
     payload["secret_findings"] = [asdict(item) for item in findings]
     payload["trust_status"] = format_trust_status(root)
     payload["logs"] = [asdict(summarize_run_log(path)) for path in list_run_logs(root)[:20]]
+    payload["approvals"] = [asdict(item) for item in list_approval_requests(root, status="all")]
     return payload
 
 
@@ -138,6 +150,8 @@ def render_dashboard(workspace: Path) -> str:
     verification = payload.get("verification") or {}
     findings = payload.get("secret_findings") or []
     logs = payload.get("logs") or []
+    approvals = payload.get("approvals") or []
+    pending_approvals = [item for item in approvals if item.get("status") == "pending"]
 
     return page(
         "cagent dashboard",
@@ -166,6 +180,12 @@ def render_dashboard(workspace: Path) -> str:
             <p class="badge {'ok' if not findings else 'warn'}">{len(findings)} likely secret finding(s)</p>
             {render_findings(findings)}
           </div>
+        </section>
+
+        <section class="card">
+          <h2>Approval review</h2>
+          <p class="badge {'ok' if not pending_approvals else 'warn'}">{len(pending_approvals)} pending approval(s)</p>
+          {render_approvals(approvals)}
         </section>
 
         <section class="card">
@@ -229,6 +249,40 @@ def render_tasks(tasks: list[dict[str, Any]]) -> str:
     return f"<table><thead><tr><th>ID</th><th>Status</th><th>Owner</th><th>Title</th></tr></thead><tbody>{rows}</tbody></table>"
 
 
+def render_approvals(approvals: list[dict[str, Any]]) -> str:
+    if not approvals:
+        return "<p>No approval requests found.</p>"
+    rows = []
+    for item in approvals:
+        controls = ""
+        if item.get("status") == "pending":
+            controls = (
+                f"<form method='post' action='/actions/approval' class='inline'>"
+                f"<input type='hidden' name='id' value='{e(item.get('id', ''))}' />"
+                f"<input type='hidden' name='action' value='approved' />"
+                f"<input type='hidden' name='note' value='Approved from cagent web UI.' />"
+                f"<button type='submit'>Approve</button>"
+                f"</form> "
+                f"<form method='post' action='/actions/approval' class='inline'>"
+                f"<input type='hidden' name='id' value='{e(item.get('id', ''))}' />"
+                f"<input type='hidden' name='action' value='rejected' />"
+                f"<input type='hidden' name='note' value='Rejected from cagent web UI.' />"
+                f"<button type='submit'>Reject</button>"
+                f"</form>"
+            )
+        rows.append(
+            "<tr>"
+            f"<td><code>{e(item.get('id', ''))}</code></td>"
+            f"<td>{e(item.get('status', ''))}</td>"
+            f"<td>{e(item.get('action_type', ''))}</td>"
+            f"<td>{e(item.get('title', ''))}<br><small>{e(item.get('reason', ''))}</small></td>"
+            f"<td><code>{e(item.get('command', item.get('path', '')))}</code></td>"
+            f"<td>{controls}</td>"
+            "</tr>"
+        )
+    return "<table><thead><tr><th>ID</th><th>Status</th><th>Type</th><th>Request</th><th>Detail</th><th>Review</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
 def render_findings(findings: list[dict[str, Any]]) -> str:
     if not findings:
         return "<p>No likely secrets found.</p>"
@@ -262,10 +316,12 @@ header{{background:#111827;color:white;padding:1rem 2rem}}
 main{{max-width:1180px;margin:1rem auto;padding:0 1rem}}
 .card{{background:white;border:1px solid #d8dee4;border-radius:10px;padding:1rem;margin:1rem 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}}
 .grid2{{display:grid;grid-template-columns:1fr 1fr;gap:1rem}}
-table{{width:100%;border-collapse:collapse}}th,td{{border-bottom:1px solid #eee;text-align:left;padding:.5rem}}
+table{{width:100%;border-collapse:collapse}}th,td{{border-bottom:1px solid #eee;text-align:left;padding:.5rem;vertical-align:top}}
 pre{{background:#f6f8fa;border:1px solid #eee;padding:1rem;overflow:auto}}
 .badge{{display:inline-block;padding:.3rem .6rem;border-radius:999px;font-weight:700}}.ok{{background:#dcfce7;color:#166534}}.warn{{background:#fef3c7;color:#92400e}}
 input{{display:block;width:100%;padding:.5rem;margin:.25rem 0 .75rem;border:1px solid #ccc;border-radius:6px}}button{{padding:.5rem .75rem;border:0;border-radius:6px;background:#2563eb;color:white;font-weight:700}}a{{color:#2563eb}}
+.inline{{display:inline}}.inline input{{display:none}}.inline button{{margin:.1rem}}
+small{{color:#57606a}}
 @media(max-width:800px){{.grid2{{grid-template-columns:1fr}}}}
 </style></head><body><header><h1>{e(title)}</h1></header><main>{body}</main></body></html>"""
 
