@@ -10,19 +10,15 @@ python3 -m venv .venv
 pip install -e '.[dev]'
 ```
 
-## Run all checks
+## Run all required checks
 
 ```bash
 make check
 ```
 
-This runs:
+This runs bytecode compilation, a focused Ruff lint gate and the test suite.
 
-```text
-python -m compileall cagent tests
-ruff check .
-pytest -q
-```
+The default lint target focuses on critical findings so CI can be introduced without forcing a full style cleanup in the same PR.
 
 ## Individual checks
 
@@ -32,6 +28,14 @@ make lint
 make test
 ```
 
+## Optional full lint
+
+```bash
+make lint-full
+```
+
+This runs the default Ruff ruleset and is intended for future cleanup PRs.
+
 ## Why this matters
 
-The project is intentionally lightweight and dependency-minimal. The quality gate keeps that simplicity while catching syntax errors, lint issues and test regressions before the agent workflow continues.
+The project is intentionally lightweight and dependency-minimal. The quality gate keeps that simplicity while catching critical lint issues and test regressions before the agent workflow continues.
