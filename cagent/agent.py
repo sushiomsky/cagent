@@ -51,6 +51,8 @@ class CodingAgent:
             base_url=config.base_url,
             model=config.model,
             timeout_seconds=config.request_timeout_seconds,
+            retries=config.request_retries,
+            retry_backoff_seconds=config.retry_backoff_seconds,
         )
         self.tools = WorkspaceTools(
             workspace=config.workspace,
