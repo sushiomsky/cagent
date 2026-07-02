@@ -8,6 +8,7 @@ from pathlib import Path
 
 from cagent import __version__
 from cagent.agent import AgentProtocolError, CodingAgent
+from cagent.command_policy import VALID_COMMAND_PROFILES
 from cagent.config import AgentConfig
 from cagent.llm import LLMError, OpenAICompatibleClient
 from cagent.model_router import VALID_MODEL_ROLES
@@ -41,10 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser("doctor", help="Check model endpoint and local workspace config.")
     add_common_model_args(doctor)
+    add_common_safety_args(doctor)
     doctor.add_argument("--workspace", default=".", help="Workspace path to validate. Default: current directory.")
 
     run = subparsers.add_parser("run", help="Run the coding agent.")
     add_common_model_args(run)
+    add_common_safety_args(run)
     run.add_argument("--workspace", default=".", help="Workspace path. Default: current directory.")
     run.add_argument("--goal", help="Goal/task for the agent. Reads stdin when omitted.")
     run.add_argument("--max-steps", type=int, help="Maximum agent tool steps.")
@@ -90,6 +93,20 @@ def add_common_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--shell-timeout", type=int, help="Shell command timeout in seconds.")
 
 
+def add_common_safety_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--command-profile",
+        choices=VALID_COMMAND_PROFILES,
+        help="Shell command policy profile. Default: CAGENT_COMMAND_PROFILE or inspect.",
+    )
+    parser.add_argument(
+        "--auto-approve-shell",
+        action="store_true",
+        default=None,
+        help="Execute approval-required shell commands after the policy allows them.",
+    )
+
+
 def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -> AgentConfig:
     """Build AgentConfig from parsed CLI arguments."""
 
@@ -103,6 +120,8 @@ def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -
         temperature=args.temperature,
         request_timeout_seconds=args.request_timeout,
         shell_timeout_seconds=args.shell_timeout,
+        command_profile=args.command_profile,
+        auto_approve_shell=args.auto_approve_shell,
     )
 
 
@@ -115,10 +134,12 @@ def run_doctor(args: argparse.Namespace) -> int:
     )
     models = client.list_models()
 
-    print(f"workspace:  {config.workspace}")
-    print(f"base_url:   {config.base_url}")
-    print(f"role:       {config.model_role}")
-    print(f"model:      {config.model}")
+    print(f"workspace:       {config.workspace}")
+    print(f"base_url:        {config.base_url}")
+    print(f"role:            {config.model_role}")
+    print(f"model:           {config.model}")
+    print(f"command_profile: {config.command_profile}")
+    print(f"auto_approve:    {config.auto_approve_shell}")
     print("profiles:")
     for line in config.model_profiles.as_lines(selected_role=config.model_role):
         print(line)
@@ -154,6 +175,8 @@ def run_agent(args: argparse.Namespace) -> int:
         max_steps=args.max_steps,
         request_timeout_seconds=args.request_timeout,
         shell_timeout_seconds=args.shell_timeout,
+        command_profile=args.command_profile,
+        auto_approve_shell=args.auto_approve_shell,
         allow_write=args.write,
         allow_shell=args.shell,
         dry_run=args.dry_run,
