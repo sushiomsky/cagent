@@ -48,9 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--goal", help="Goal/task for the agent. Reads stdin when omitted.")
     run.add_argument("--max-steps", type=int, help="Maximum agent tool steps.")
     run.add_argument("--max-tokens", type=int, help="Maximum output tokens per model response.")
-    run.add_argument("--write", action="store_true", help="Allow file writes inside the workspace.")
+    run.add_argument("--write", action="store_true", help="Allow file writes and patch application inside the workspace.")
     run.add_argument("--shell", action="store_true", help="Allow guarded shell commands inside the workspace.")
     run.add_argument("--dry-run", action="store_true", help="Show intended writes/commands without executing them.")
+    run.add_argument("--log-run", action="store_true", help="Write a JSONL run log under .cagent-runs/.")
     run.add_argument("--show-tool-output", action="store_true", help="Print full tool output after each step.")
 
     return parser
@@ -115,6 +116,7 @@ def run_agent(args: argparse.Namespace) -> int:
         allow_write=args.write,
         allow_shell=args.shell,
         dry_run=args.dry_run,
+        log_run=args.log_run,
     )
 
     agent = CodingAgent(config)
@@ -129,6 +131,8 @@ def run_agent(args: argparse.Namespace) -> int:
             print("-" * 80)
 
     print(result.final_message)
+    if result.log_path:
+        print(f"run_log: {result.log_path}")
     return 0
 
 
