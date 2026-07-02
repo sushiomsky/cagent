@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from cagent.command_policy import normalize_command_profile
 from cagent.model_router import (
     DEFAULT_DAILY_MODEL,
     DEFAULT_FAST_MODEL,
@@ -33,6 +34,8 @@ class AgentConfig:
     log_run: bool = False
     model_role: str = "default"
     model_profiles: ModelProfiles = ModelProfiles()
+    command_profile: str = "inspect"
+    auto_approve_shell: bool = False
 
     @classmethod
     def from_values(
@@ -49,6 +52,8 @@ class AgentConfig:
         max_steps: int | None = None,
         request_timeout_seconds: int | None = None,
         shell_timeout_seconds: int | None = None,
+        command_profile: str | None = None,
+        auto_approve_shell: bool | None = None,
         allow_write: bool = False,
         allow_shell: bool = False,
         dry_run: bool = False,
@@ -66,6 +71,9 @@ class AgentConfig:
         )
         selected_role = normalize_model_role(model_role or os.environ.get("CAGENT_MODEL_ROLE") or "default")
         selected_model = profiles.resolve(selected_role)
+        selected_command_profile = normalize_command_profile(
+            command_profile or os.environ.get("CAGENT_COMMAND_PROFILE") or "inspect"
+        )
 
         return cls(
             base_url=(base_url or os.environ.get("CAGENT_BASE_URL") or "http://127.0.0.1:18080/v1").rstrip("/"),
@@ -90,6 +98,12 @@ class AgentConfig:
             log_run=_env_flag("CAGENT_LOG_RUNS", False) if log_run is None else log_run,
             model_role=selected_role,
             model_profiles=profiles,
+            command_profile=selected_command_profile,
+            auto_approve_shell=(
+                _env_flag("CAGENT_AUTO_APPROVE_SHELL", False)
+                if auto_approve_shell is None
+                else auto_approve_shell
+            ),
         )
 
 
