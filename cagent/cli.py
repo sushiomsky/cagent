@@ -35,6 +35,7 @@ from cagent.project_engine import (
     verify_project,
     write_final_report,
 )
+from cagent.project_state_run import format_project_run_state, load_project_run_state, record_project_run_state
 from cagent.secret_scan import format_findings, scan_workspace
 from cagent.stdio_server import serve_stdio
 from cagent.trust import format_trust_status, trust_workspace
@@ -55,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_resume(args)
         if args.command == "loop":
             return run_project_loop(args)
+        if args.command == "run-state":
+            return run_state(args)
         if args.command == "task":
             return run_task(args)
         if args.command == "tool":
@@ -138,6 +141,9 @@ def build_parser() -> argparse.ArgumentParser:
     loop.add_argument("--shell", action="store_true")
     loop.add_argument("--log-run", action="store_true", default=None)
     loop.add_argument("--show-tool-output", action="store_true")
+
+    run_state = subparsers.add_parser("run-state", help="Show the last recorded project-loop state.")
+    run_state.add_argument("--workspace", default=".")
 
     task = subparsers.add_parser("task", help="Update project task state.")
     task.add_argument("--workspace", default=".")
@@ -277,7 +283,12 @@ def run_doctor(args: argparse.Namespace) -> int:
     print(f"redact_secrets:  {config.redact_secrets}")
     print(format_trust_status(config.workspace))
     try:
-        models = OpenAICompatibleClient(base_url=config.base_url, model=config.model, timeout_seconds=config.request_timeout_seconds).list_models()
+        client = OpenAICompatibleClient(
+            base_url=config.base_url,
+            model=config.model,
+            timeout_seconds=config.request_timeout_seconds,
+        )
+        models = client.list_models()
     except LLMError as exc:
         print(f"models:          unavailable ({exc})")
         return 1
@@ -382,6 +393,14 @@ def run_project_loop(args: argparse.Namespace) -> int:
         log_run=args.log_run,
     )
     result = CodingAgent(config).run(goal)
+    run_log = str(result.log_path) if result.log_path else ""
+    record_project_run_state(
+        workspace,
+        current_action=action,
+        last_result=result.final_message,
+        last_step_count=len(result.steps),
+        last_run_log=run_log,
+    )
     for step in result.steps:
         print(f"[{step.index}] {step.tool}: {'ok' if step.ok else 'error'}")
         if args.show_tool_output:
@@ -389,6 +408,11 @@ def run_project_loop(args: argparse.Namespace) -> int:
             print("-" * 80)
     print(result.final_message)
     print(next_action(workspace))
+    return 0
+
+
+def run_state(args: argparse.Namespace) -> int:
+    print(format_project_run_state(load_project_run_state(Path(args.workspace).resolve())))
     return 0
 
 
@@ -406,7 +430,13 @@ def run_tool(args: argparse.Namespace) -> int:
 
 
 def run_research(args: argparse.Namespace) -> int:
-    path = add_research_note(Path(args.workspace).resolve(), topic=args.topic, source=args.source, summary=args.summary, decision=args.decision)
+    path = add_research_note(
+        Path(args.workspace).resolve(),
+        topic=args.topic,
+        source=args.source,
+        summary=args.summary,
+        decision=args.decision,
+    )
     print(f"research note: {path}")
     return 0
 
