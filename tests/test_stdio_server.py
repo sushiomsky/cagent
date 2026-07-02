@@ -2,6 +2,7 @@ import json
 from io import StringIO
 
 from cagent.project_engine import create_project
+from cagent.project_snapshot import save_snapshot
 from cagent.stdio_server import handle_json_line, serve_stdio
 
 
@@ -17,6 +18,7 @@ def test_initialize_response_contains_server_info():
 
     assert response["result"]["serverInfo"]["name"] == "cagent-stdio"
     assert response["result"]["capabilities"]["tools"]
+    assert response["result"]["capabilities"]["resources"]
 
 
 def test_tools_list_includes_project_tools():
@@ -25,6 +27,60 @@ def test_tools_list_includes_project_tools():
     tools = response["result"]["tools"]
     assert any(tool["name"] == "cagent.resume" for tool in tools)
     assert any(tool["name"] == "cagent.secret_scan" for tool in tools)
+
+
+def test_resources_list_includes_project_resources(tmp_path):
+    create_project(
+        root=tmp_path,
+        name="Demo",
+        project_type="software_project",
+        goal="Build it.",
+        init_git=False,
+        create_hooks=False,
+    )
+    save_snapshot(tmp_path, action="T001", result="done", steps=1)
+
+    response = handle_json_line(rpc("resources/list", {"workspace": str(tmp_path)}))
+
+    resources = response["result"]["resources"]
+    uris = {item["uri"] for item in resources}
+    assert "cagent://project/spec" in uris
+    assert "cagent://project/tasks" in uris
+    assert "cagent://project/snapshot" in uris
+    assert any(item["exists"] for item in resources if item["uri"] == "cagent://project/snapshot")
+
+
+def test_resources_read_returns_text(tmp_path):
+    create_project(
+        root=tmp_path,
+        name="Demo",
+        project_type="software_project",
+        goal="Build it.",
+        init_git=False,
+        create_hooks=False,
+    )
+
+    response = handle_json_line(
+        rpc(
+            "resources/read",
+            {"workspace": str(tmp_path), "uri": "cagent://project/spec"},
+        )
+    )
+
+    contents = response["result"]["contents"]
+    assert contents[0]["uri"] == "cagent://project/spec"
+    assert "Project Spec: Demo" in contents[0]["text"]
+
+
+def test_resources_read_unknown_uri_returns_error(tmp_path):
+    response = handle_json_line(
+        rpc(
+            "resources/read",
+            {"workspace": str(tmp_path), "uri": "cagent://project/missing"},
+        )
+    )
+
+    assert response["error"]["code"] == -32602
 
 
 def test_tools_call_resume_reads_project_state(tmp_path):
