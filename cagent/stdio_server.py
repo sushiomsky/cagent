@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
+from cagent.config import AgentConfig
 from cagent.mcp_manifest import build_manifest
 from cagent.project_engine import next_action, verify_project, write_final_report
 from cagent.secret_scan import format_findings, scan_workspace
@@ -48,6 +49,18 @@ class PromptDefinition:
 
 
 TOOLS: tuple[ToolDefinition, ...] = (
+    ToolDefinition(
+        name="cagent.config",
+        description="Return resolved runtime config without contacting the model endpoint.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "workspace": {"type": "string", "default": "."},
+                "base_url": {"type": "string"},
+                "model_role": {"type": "string", "enum": ["default", "fast", "reviewer"]},
+            },
+        },
+    ),
     ToolDefinition(
         name="cagent.resume",
         description="Read .cagent state and return the next project action.",
@@ -225,6 +238,8 @@ def call_tool(params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise RpcError(-32602, "tools/call arguments must be an object")
 
+    if name == "cagent.config":
+        return {"content": [{"type": "json", "json": _config_payload(arguments)}], "isError": False}
     if name == "cagent.resume":
         text = next_action(_workspace(arguments))
     elif name == "cagent.verify":
@@ -325,3 +340,32 @@ def _format_verification(workspace: Path) -> str:
 
 def _mime_type(path: Path) -> str:
     return "application/json" if path.suffix == ".json" else "text/markdown"
+
+
+def _config_payload(arguments: dict[str, Any]) -> dict[str, Any]:
+    config = AgentConfig.from_values(
+        workspace=_workspace(arguments),
+        base_url=_optional_str(arguments, "base_url"),
+        model_role=_optional_str(arguments, "model_role"),
+    )
+    return {
+        "workspace": str(config.workspace),
+        "base_url": config.base_url,
+        "model_role": config.model_role,
+        "model": config.model,
+        "model_profiles": {
+            "default": config.model_profiles.default,
+            "fast": config.model_profiles.fast,
+            "reviewer": config.model_profiles.reviewer,
+        },
+        "request_timeout_seconds": config.request_timeout_seconds,
+        "request_retries": config.request_retries,
+        "retry_backoff_seconds": config.retry_backoff_seconds,
+        "command_profile": config.command_profile,
+        "redact_secrets": config.redact_secrets,
+    }
+
+
+def _optional_str(arguments: dict[str, Any], key: str) -> str | None:
+    value = arguments.get(key)
+    return value if isinstance(value, str) and value else None
