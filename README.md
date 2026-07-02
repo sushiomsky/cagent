@@ -27,6 +27,8 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - task board, tool registry, research notes, artifacts and final reports
 - local run-log viewer and HTML export
 - MCP-style capability manifest export
+- local secret scanning and default tool-output redaction
+- workspace trust metadata
 - patch-based edits via `git apply`
 - git status/diff review tool
 - optional local JSONL run logs
@@ -106,6 +108,7 @@ export CAGENT_REVIEWER_MODEL=qwen3-coder:30b-a3b-q4_K_M
 export CAGENT_MODEL_ROLE=default
 export CAGENT_COMMAND_PROFILE=inspect
 export CAGENT_AUTO_APPROVE_SHELL=0
+export CAGENT_REDACT_SECRETS=1
 ```
 
 Choose a model profile per run:
@@ -131,7 +134,29 @@ Command profiles:
 - `network`: network/dependency commands require `--auto-approve-shell`
 - `deploy`: broadest profile, still blocks absolute safety patterns
 
-Optional run logs:
+## Security guardrails
+
+Likely secrets are redacted from tool output before it is sent back to the model. Disable this only for a reviewed one-off run:
+
+```bash
+cagent run --workspace . --no-redact-secrets --goal "Inspect this file exactly."
+```
+
+Scan a workspace locally:
+
+```bash
+cagent secret-scan --workspace .
+cagent secret-scan --workspace . --fail-on-findings
+```
+
+Mark a workspace as reviewed/trusted:
+
+```bash
+cagent trust --workspace . --reason "Reviewed repo and local policies."
+cagent trust --workspace . --status
+```
+
+## Run logs
 
 ```bash
 export CAGENT_LOG_RUNS=1
@@ -203,7 +228,7 @@ cagent final-report --workspace ./my-agent-project --notes "Ready for review."
 cagent doctor --base-url http://127.0.0.1:18080/v1 --model-role default
 ```
 
-The doctor command shows the selected role, selected model, configured profiles, command profile and models reported by the endpoint.
+The doctor command shows the selected role, selected model, configured profiles, command profile, redaction setting, trust status and models reported by the endpoint.
 
 ## Run
 
@@ -274,3 +299,4 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] persistent task state and resume loop
 - [x] tool registry, research notes, verification and final report
 - [x] run-log viewer and MCP-style manifest export
+- [x] local secret scanning, redaction and workspace trust
