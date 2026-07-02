@@ -19,6 +19,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 
 - OpenAI-compatible `/v1/chat/completions` client
 - no mandatory cloud dependency
+- fast/default/reviewer model profiles
 - workspace-scoped file access
 - guarded shell execution with timeout
 - repo map and context pack tools
@@ -29,7 +30,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - copy-paste friendly CLI
 - works with Ollama's OpenAI-compatible API
 
-## Recommended first model for a Tesla T4
+## Recommended model profiles for a Tesla T4
 
 Use this as the default daily coding model:
 
@@ -37,7 +38,19 @@ Use this as the default daily coding model:
 qwen2.5-coder:14b-instruct-q4_K_M
 ```
 
-Use a larger model only as an optional slow reviewer/deep mode. A single Tesla T4 has 16 GB VRAM, so a stable 14B quantized coder model is usually more useful than a larger model that constantly offloads to CPU.
+Use the fast profile for cheaper inspection and short edits:
+
+```text
+qwen2.5-coder:7b-instruct-q4_K_M
+```
+
+Use the reviewer profile only as an optional slow/deep mode:
+
+```text
+qwen3-coder:30b-a3b-q4_K_M
+```
+
+A single Tesla T4 has 16 GB VRAM, so a stable 14B quantized coder model is usually more useful as the default than a larger model that constantly offloads to CPU.
 
 ## Install
 
@@ -54,6 +67,8 @@ Example with Ollama:
 
 ```bash
 ollama pull qwen2.5-coder:14b-instruct-q4_K_M
+ollama pull qwen2.5-coder:7b-instruct-q4_K_M
+ollama pull qwen3-coder:30b-a3b-q4_K_M
 ollama serve
 ```
 
@@ -74,6 +89,16 @@ http://127.0.0.1:18080/v1
 ```bash
 export CAGENT_BASE_URL=http://127.0.0.1:18080/v1
 export CAGENT_MODEL=qwen2.5-coder:14b-instruct-q4_K_M
+export CAGENT_FAST_MODEL=qwen2.5-coder:7b-instruct-q4_K_M
+export CAGENT_REVIEWER_MODEL=qwen3-coder:30b-a3b-q4_K_M
+export CAGENT_MODEL_ROLE=default
+```
+
+Choose a profile per run:
+
+```bash
+cagent run --model-role fast --workspace . --goal "Inspect the repo quickly."
+cagent run --model-role reviewer --workspace . --goal "Review the current diff."
 ```
 
 Optional run logs:
@@ -87,8 +112,10 @@ Logs are written to `.cagent-runs/*.jsonl` and may contain model responses, tool
 ## Doctor
 
 ```bash
-cagent doctor --base-url http://127.0.0.1:18080/v1 --model qwen2.5-coder:14b-instruct-q4_K_M
+cagent doctor --base-url http://127.0.0.1:18080/v1 --model-role default
 ```
+
+The doctor command shows the selected role, selected model, configured profiles and models reported by the endpoint.
 
 ## Run
 
@@ -148,6 +175,6 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] optional run logs
 - [x] test command discovery
 - [x] repo map and context packer
-- [ ] model router: fast/default/reviewer
+- [x] model router: fast/default/reviewer
 - [ ] approval prompts for risky actions
 - [ ] OpenWebUI/Codex integration docs

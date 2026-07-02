@@ -6,6 +6,14 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from cagent.model_router import (
+    DEFAULT_DAILY_MODEL,
+    DEFAULT_FAST_MODEL,
+    DEFAULT_REVIEWER_MODEL,
+    ModelProfiles,
+    normalize_model_role,
+)
+
 
 @dataclass(frozen=True)
 class AgentConfig:
@@ -23,6 +31,8 @@ class AgentConfig:
     allow_shell: bool = False
     dry_run: bool = False
     log_run: bool = False
+    model_role: str = "default"
+    model_profiles: ModelProfiles = ModelProfiles()
 
     @classmethod
     def from_values(
@@ -30,6 +40,9 @@ class AgentConfig:
         *,
         base_url: str | None = None,
         model: str | None = None,
+        fast_model: str | None = None,
+        reviewer_model: str | None = None,
+        model_role: str | None = None,
         workspace: str | Path | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
@@ -46,9 +59,17 @@ class AgentConfig:
         selected_workspace = Path(workspace or os.environ.get("CAGENT_WORKSPACE", ".")).resolve()
         selected_workspace.mkdir(parents=True, exist_ok=True)
 
+        profiles = ModelProfiles(
+            default=model or os.environ.get("CAGENT_MODEL") or DEFAULT_DAILY_MODEL,
+            fast=fast_model or os.environ.get("CAGENT_FAST_MODEL") or DEFAULT_FAST_MODEL,
+            reviewer=reviewer_model or os.environ.get("CAGENT_REVIEWER_MODEL") or DEFAULT_REVIEWER_MODEL,
+        )
+        selected_role = normalize_model_role(model_role or os.environ.get("CAGENT_MODEL_ROLE") or "default")
+        selected_model = profiles.resolve(selected_role)
+
         return cls(
             base_url=(base_url or os.environ.get("CAGENT_BASE_URL") or "http://127.0.0.1:18080/v1").rstrip("/"),
-            model=model or os.environ.get("CAGENT_MODEL") or "qwen2.5-coder:14b-instruct-q4_K_M",
+            model=selected_model,
             workspace=selected_workspace,
             temperature=float(temperature if temperature is not None else os.environ.get("CAGENT_TEMPERATURE", "0.15")),
             max_tokens=int(max_tokens if max_tokens is not None else os.environ.get("CAGENT_MAX_TOKENS", "4096")),
@@ -67,6 +88,8 @@ class AgentConfig:
             allow_shell=allow_shell,
             dry_run=dry_run,
             log_run=_env_flag("CAGENT_LOG_RUNS", False) if log_run is None else log_run,
+            model_role=selected_role,
+            model_profiles=profiles,
         )
 
 

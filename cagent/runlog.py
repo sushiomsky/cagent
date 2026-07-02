@@ -18,7 +18,15 @@ class RunLogger:
     in workspaces where that is acceptable.
     """
 
-    def __init__(self, *, workspace: Path, goal: str, model: str, base_url: str) -> None:
+    def __init__(
+        self,
+        *,
+        workspace: Path,
+        goal: str,
+        model: str,
+        base_url: str,
+        model_role: str = "default",
+    ) -> None:
         self.run_id = uuid.uuid4().hex
         self.path = workspace / ".cagent-runs" / f"{_timestamp()}-{self.run_id}.jsonl"
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,6 +36,7 @@ class RunLogger:
                 "run_id": self.run_id,
                 "goal": goal,
                 "model": model,
+                "model_role": model_role,
                 "base_url": base_url,
             },
         )
