@@ -9,6 +9,21 @@ from __future__ import annotations
 import json
 from typing import Any
 
+PROJECT_RESOURCES = [
+    {"uri": "cagent://project/spec", "name": "PROJECT_SPEC.md", "kind": "project_spec"},
+    {"uri": "cagent://project/tasks", "name": "TASKS.md", "kind": "task_board"},
+    {"uri": "cagent://project/workflow", "name": "WORKFLOW.md", "kind": "workflow"},
+    {"uri": "cagent://project/agents", "name": "AGENTS.md", "kind": "agent_roles"},
+    {"uri": "cagent://project/final-report", "name": "FINAL_REPORT.md", "kind": "final_report"},
+    {"uri": "cagent://project/snapshot", "name": "snapshot.json", "kind": "project_snapshot"},
+]
+
+ROLE_TEMPLATES = [
+    {"name": "cagent.planner", "kind": "planning", "description": "Plan the next small project step."},
+    {"name": "cagent.researcher", "kind": "research", "description": "Summarize notes and options."},
+    {"name": "cagent.reviewer", "kind": "review", "description": "Review correctness, risks and missing checks."},
+]
+
 
 def build_manifest() -> dict[str, Any]:
     """Return a stable manifest of exposed cagent capabilities."""
@@ -94,6 +109,8 @@ def build_manifest() -> dict[str, Any]:
                 "description": "Run a local dependency-free dashboard for project state, security, tasks and logs.",
             },
         ],
+        "resources": PROJECT_RESOURCES,
+        "role_templates": ROLE_TEMPLATES,
     }
 
 
