@@ -78,6 +78,11 @@ def build_manifest() -> dict[str, Any]:
                 "kind": "stdio_adapter",
                 "description": "Run a line-delimited JSON-RPC stdio adapter exposing conservative cagent tools.",
             },
+            {
+                "name": "serve-web",
+                "kind": "web_ui",
+                "description": "Run a local dependency-free dashboard for project state, security, tasks and logs.",
+            },
         ],
     }
 
