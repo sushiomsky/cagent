@@ -153,16 +153,25 @@ Status: implemented in `phase17/approval-queue` and merged.
 
 ## Phase 18: Approval integration
 
-Status: implemented in `phase18/approval-integration`.
+Status: implemented in `phase18/approval-integration` and merged.
 
 - Make review-required tool policy decisions automatically create queue entries.
 - Return the approval request ID to the agent loop.
 - Add safer process invocation behavior for reviewed local tool actions.
 - Add docs and tests.
 
-## Phase 19: Future improvements
+## Phase 19: Web approval review
+
+Status: implemented in `phase19/web-approval-review`.
+
+- Show approval requests in `cagent serve-web`.
+- Include approvals in `/api/status`.
+- Add web buttons to approve or reject pending requests.
+- Keep review state changes separate from execution.
+- Add docs and tests.
+
+## Phase 20: Future improvements
 
 - Full SDK-backed MCP server mode.
 - Optional language-specific repo map parsers.
-- Add web UI approval review surface.
 - Add reviewed runner for approved queue items.
