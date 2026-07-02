@@ -11,6 +11,7 @@ from typing import Any
 
 from cagent.command_policy import evaluate_command, normalize_command_profile
 from cagent.repomap import build_context_pack, build_repo_map, format_context_pack, format_repo_map
+from cagent.secret_scan import redact_text
 
 
 SKIPPED_DIRS = {
@@ -55,6 +56,7 @@ class WorkspaceTools:
         shell_timeout_seconds: int,
         command_profile: str = "inspect",
         auto_approve_shell: bool = False,
+        redact_secrets: bool = True,
     ) -> None:
         self.workspace = workspace.resolve()
         self.allow_write = allow_write
@@ -63,6 +65,7 @@ class WorkspaceTools:
         self.shell_timeout_seconds = shell_timeout_seconds
         self.command_profile = normalize_command_profile(command_profile)
         self.auto_approve_shell = auto_approve_shell
+        self.redact_secrets = redact_secrets
 
     def execute(self, tool: str, args: dict[str, Any]) -> ToolResult:
         """Dispatch a parsed model action to a concrete tool."""
@@ -121,7 +124,7 @@ class WorkspaceTools:
         except KeyError as exc:
             return ToolResult(False, f"Missing required tool argument: {exc}")
         except Exception as exc:  # noqa: BLE001 - tool errors must be returned to the model.
-            return ToolResult(False, f"Tool failed: {type(exc).__name__}: {exc}")
+            return ToolResult(False, self._redact(f"Tool failed: {type(exc).__name__}: {exc}"))
 
         return ToolResult(False, f"Unknown tool: {tool}")
 
@@ -171,7 +174,7 @@ class WorkspaceTools:
             max_files=max_files,
             max_chars=max_chars,
         )
-        return ToolResult(True, format_context_pack(pack))
+        return ToolResult(True, self._redact(format_context_pack(pack)))
 
     def read_file(
         self,
@@ -196,7 +199,7 @@ class WorkspaceTools:
         output = "\n".join(numbered)
         if len(output) > max_chars:
             output = output[:max_chars] + "\n... truncated ..."
-        return ToolResult(True, output)
+        return ToolResult(True, self._redact(output))
 
     def write_file(self, *, path: str, content: str, overwrite: bool = True) -> ToolResult:
         if not self.allow_write:
@@ -223,14 +226,14 @@ class WorkspaceTools:
 
         check = self._run_git_apply(["git", "apply", "--check", "--whitespace=nowarn"], patch)
         if check.returncode != 0:
-            return ToolResult(False, _format_completed_process(check))
+            return ToolResult(False, self._redact(_format_completed_process(check)))
 
         if check_only or self.dry_run:
             prefix = "Dry-run: " if self.dry_run and not check_only else ""
             return ToolResult(True, f"{prefix}patch check passed; no files were changed.")
 
         applied = self._run_git_apply(["git", "apply", "--whitespace=nowarn"], patch)
-        return ToolResult(applied.returncode == 0, _format_completed_process(applied))
+        return ToolResult(applied.returncode == 0, self._redact(_format_completed_process(applied)))
 
     def search_text(self, *, pattern: str, path: str = ".", max_results: int = 50) -> ToolResult:
         root = self.resolve_path(path)
@@ -249,11 +252,11 @@ class WorkspaceTools:
                     if regex.search(line):
                         results.append(f"{relative}:{line_no}: {line}")
                         if len(results) >= max_results:
-                            return ToolResult(True, "\n".join(results) + "\n... truncated ...")
+                            return ToolResult(True, self._redact("\n".join(results) + "\n... truncated ..."))
             except OSError as exc:
                 results.append(f"{relative}: could not read: {exc}")
 
-        return ToolResult(True, "\n".join(results) if results else "No matches.")
+        return ToolResult(True, self._redact("\n".join(results) if results else "No matches."))
 
     def git_diff(self, *, path: str = ".", max_chars: int = 40_000) -> ToolResult:
         resolved = self.resolve_path(path)
@@ -271,14 +274,14 @@ class WorkspaceTools:
             input_text=None,
         )
         if status.returncode != 0:
-            return ToolResult(False, _format_completed_process(status))
+            return ToolResult(False, self._redact(_format_completed_process(status)))
         if diff.returncode != 0:
-            return ToolResult(False, _format_completed_process(diff))
+            return ToolResult(False, self._redact(_format_completed_process(diff)))
 
         output = f"--- git status --short ---\n{status.stdout}\n--- git diff ---\n{diff.stdout}"
         if len(output) > max_chars:
             output = output[:max_chars] + "\n... truncated ..."
-        return ToolResult(True, output)
+        return ToolResult(True, self._redact(output))
 
     def discover_tests(self) -> ToolResult:
         candidates: list[str] = []
@@ -337,7 +340,7 @@ class WorkspaceTools:
         output += _format_completed_process(completed)
         if len(output) > 40_000:
             output = output[:40_000] + "\n... truncated ..."
-        return ToolResult(completed.returncode == 0, output)
+        return ToolResult(completed.returncode == 0, self._redact(output))
 
     def _run_git_apply(self, command: list[str], patch: str) -> subprocess.CompletedProcess[str]:
         return _run_command(
@@ -346,6 +349,11 @@ class WorkspaceTools:
             timeout_seconds=self.shell_timeout_seconds,
             input_text=patch,
         )
+
+    def _redact(self, output: str) -> str:
+        if not self.redact_secrets:
+            return output
+        return redact_text(output)
 
 
 def _iter_text_files(root: Path) -> list[Path]:
