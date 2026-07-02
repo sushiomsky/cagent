@@ -10,6 +10,7 @@ from cagent import __version__
 from cagent.agent import AgentProtocolError, CodingAgent
 from cagent.config import AgentConfig
 from cagent.llm import LLMError, OpenAICompatibleClient
+from cagent.model_router import VALID_MODEL_ROLES
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -63,22 +64,50 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def add_common_model_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--base-url", help="OpenAI-compatible base URL. Default: CAGENT_BASE_URL or http://127.0.0.1:18080/v1")
-    parser.add_argument("--model", help="Model name. Default: CAGENT_MODEL or qwen2.5-coder:14b-instruct-q4_K_M")
+    parser.add_argument(
+        "--base-url",
+        help="OpenAI-compatible base URL. Default: CAGENT_BASE_URL or http://127.0.0.1:18080/v1",
+    )
+    parser.add_argument(
+        "--model",
+        help="Default model profile. Default: CAGENT_MODEL or qwen2.5-coder:14b-instruct-q4_K_M",
+    )
+    parser.add_argument(
+        "--fast-model",
+        help="Fast model profile. Default: CAGENT_FAST_MODEL or qwen2.5-coder:7b-instruct-q4_K_M",
+    )
+    parser.add_argument(
+        "--reviewer-model",
+        help="Reviewer model profile. Default: CAGENT_REVIEWER_MODEL or qwen3-coder:30b-a3b-q4_K_M",
+    )
+    parser.add_argument(
+        "--model-role",
+        choices=VALID_MODEL_ROLES,
+        help="Model profile to use for this command. Default: CAGENT_MODEL_ROLE or default.",
+    )
     parser.add_argument("--temperature", type=float, help="Model temperature. Default: 0.15")
     parser.add_argument("--request-timeout", type=int, help="HTTP request timeout in seconds.")
     parser.add_argument("--shell-timeout", type=int, help="Shell command timeout in seconds.")
 
 
-def run_doctor(args: argparse.Namespace) -> int:
-    config = AgentConfig.from_values(
+def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -> AgentConfig:
+    """Build AgentConfig from parsed CLI arguments."""
+
+    return AgentConfig.from_values(
         base_url=args.base_url,
         model=args.model,
-        workspace=args.workspace,
+        fast_model=args.fast_model,
+        reviewer_model=args.reviewer_model,
+        model_role=args.model_role,
+        workspace=workspace,
         temperature=args.temperature,
         request_timeout_seconds=args.request_timeout,
         shell_timeout_seconds=args.shell_timeout,
     )
+
+
+def run_doctor(args: argparse.Namespace) -> int:
+    config = build_config_from_args(args, workspace=args.workspace)
     client = OpenAICompatibleClient(
         base_url=config.base_url,
         model=config.model,
@@ -86,9 +115,13 @@ def run_doctor(args: argparse.Namespace) -> int:
     )
     models = client.list_models()
 
-    print(f"workspace: {config.workspace}")
-    print(f"base_url:  {config.base_url}")
-    print(f"model:     {config.model}")
+    print(f"workspace:  {config.workspace}")
+    print(f"base_url:   {config.base_url}")
+    print(f"role:       {config.model_role}")
+    print(f"model:      {config.model}")
+    print("profiles:")
+    for line in config.model_profiles.as_lines(selected_role=config.model_role):
+        print(line)
     if models:
         print("models:")
         for model in models:
@@ -98,7 +131,7 @@ def run_doctor(args: argparse.Namespace) -> int:
         print("models: endpoint responded but returned no model IDs")
 
     if config.model not in models and models:
-        print("warning: configured model was not listed by the endpoint", file=sys.stderr)
+        print("warning: selected model was not listed by the endpoint", file=sys.stderr)
         return 1
     return 0
 
@@ -112,6 +145,9 @@ def run_agent(args: argparse.Namespace) -> int:
     config = AgentConfig.from_values(
         base_url=args.base_url,
         model=args.model,
+        fast_model=args.fast_model,
+        reviewer_model=args.reviewer_model,
+        model_role=args.model_role,
         workspace=Path(args.workspace),
         temperature=args.temperature,
         max_tokens=args.max_tokens,
