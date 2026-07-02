@@ -134,7 +134,7 @@ Status: implemented in `phase15/web-ui` and merged.
 
 ## Phase 16: Secret scanning quality
 
-Status: implemented in `phase16/secret-quality`.
+Status: implemented in `phase16/secret-quality` and merged.
 
 - Add severity to findings.
 - Add entropy scoring and filtering for noisy placeholder values.
@@ -142,8 +142,18 @@ Status: implemented in `phase16/secret-quality`.
 - Add machine-readable `findings_json` helper.
 - Add docs and tests.
 
-## Phase 17: Future improvements
+## Phase 17: Approval queue
+
+Status: implemented in `phase17/approval-queue`.
+
+- Add durable `.cagent/approvals.jsonl` storage.
+- Add `cagent approval request/list/approve/reject`.
+- Add text and JSON output for approvals.
+- Add docs, manifest entry and tests.
+
+## Phase 18: Future improvements
 
 - Full SDK-backed MCP server mode.
 - Optional language-specific repo map parsers.
-- Rich approval queues for project/task actions.
+- Make command policy approval decisions automatically create queue entries.
+- Add web UI approval review surface.

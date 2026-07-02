@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from cagent import __version__
 from cagent.agent import AgentProtocolError, CodingAgent
+from cagent.approval_queue import (
+    approvals_json,
+    create_approval_request,
+    format_approval_requests,
+    list_approval_requests,
+    update_approval_status,
+)
 from cagent.command_policy import VALID_COMMAND_PROFILES
 from cagent.config import AgentConfig
 from cagent.llm import LLMError, OpenAICompatibleClient
@@ -63,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_secret_scan(args)
         if args.command == "trust":
             return run_trust(args)
+        if args.command == "approval":
+            return run_approval(args)
         if args.command == "serve-stdio":
             return serve_stdio()
         if args.command == "serve-web":
@@ -176,6 +186,33 @@ def build_parser() -> argparse.ArgumentParser:
     trust.add_argument("--workspace", default=".")
     trust.add_argument("--status", action="store_true", help="Only print trust status.")
     trust.add_argument("--reason", default="User explicitly trusted this workspace.")
+
+    approval = subparsers.add_parser("approval", help="Manage local approval requests.")
+    approval_sub = approval.add_subparsers(dest="approval_command")
+
+    approval_request = approval_sub.add_parser("request", help="Create a pending approval request.")
+    approval_request.add_argument("--workspace", default=".")
+    approval_request.add_argument("--type", dest="action_type", required=True, help="Action type, e.g. shell, write, network, deploy.")
+    approval_request.add_argument("--title", required=True)
+    approval_request.add_argument("--reason", required=True)
+    approval_request.add_argument("--command", default="")
+    approval_request.add_argument("--path", default="")
+    approval_request.add_argument("--payload", default="{}", help="Optional JSON payload.")
+
+    approval_list = approval_sub.add_parser("list", help="List approval requests.")
+    approval_list.add_argument("--workspace", default=".")
+    approval_list.add_argument("--status", choices=("pending", "approved", "rejected", "all"), default="pending")
+    approval_list.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+
+    approval_approve = approval_sub.add_parser("approve", help="Mark an approval request as approved.")
+    approval_approve.add_argument("--workspace", default=".")
+    approval_approve.add_argument("id")
+    approval_approve.add_argument("--note", default="")
+
+    approval_reject = approval_sub.add_parser("reject", help="Mark an approval request as rejected.")
+    approval_reject.add_argument("--workspace", default=".")
+    approval_reject.add_argument("id")
+    approval_reject.add_argument("--note", default="")
 
     serve_web = subparsers.add_parser("serve-web", help="Run the local dependency-free cagent web UI.")
     serve_web.add_argument("--workspace", default=".")
@@ -455,6 +492,40 @@ def run_trust(args: argparse.Namespace) -> int:
         trust_workspace(workspace, reason=args.reason)
     print(format_trust_status(workspace))
     return 0
+
+
+def run_approval(args: argparse.Namespace) -> int:
+    workspace = Path(args.workspace).resolve()
+    command = getattr(args, "approval_command", None)
+    if command == "request":
+        payload = json.loads(args.payload)
+        if not isinstance(payload, dict):
+            raise ValueError("--payload must be a JSON object")
+        request = create_approval_request(
+            workspace,
+            action_type=args.action_type,
+            title=args.title,
+            reason=args.reason,
+            command=args.command,
+            path=args.path,
+            payload=payload,
+        )
+        print(format_approval_requests([request]))
+        return 0
+    if command == "list":
+        requests = list_approval_requests(workspace, status=args.status)
+        print(approvals_json(requests) if args.json else format_approval_requests(requests))
+        return 0
+    if command == "approve":
+        request = update_approval_status(workspace, args.id, status="approved", response_note=args.note)
+        print(format_approval_requests([request]))
+        return 0
+    if command == "reject":
+        request = update_approval_status(workspace, args.id, status="rejected", response_note=args.note)
+        print(format_approval_requests([request]))
+        return 0
+    print("error: approval requires one of: request, list, approve, reject", file=sys.stderr)
+    return 2
 
 
 def run_mcp_manifest() -> int:
