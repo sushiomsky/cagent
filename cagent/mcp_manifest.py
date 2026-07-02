@@ -49,6 +49,11 @@ def build_manifest() -> dict[str, Any]:
                 "description": "Register planned or available project tools.",
             },
             {
+                "name": "approval",
+                "kind": "approval_queue",
+                "description": "Create, list, approve and reject local approval requests.",
+            },
+            {
                 "name": "verify",
                 "kind": "verification",
                 "description": "Check project state against required files and task state.",
