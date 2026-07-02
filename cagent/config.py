@@ -36,6 +36,7 @@ class AgentConfig:
     model_profiles: ModelProfiles = ModelProfiles()
     command_profile: str = "inspect"
     auto_approve_shell: bool = False
+    redact_secrets: bool = True
 
     @classmethod
     def from_values(
@@ -54,6 +55,7 @@ class AgentConfig:
         shell_timeout_seconds: int | None = None,
         command_profile: str | None = None,
         auto_approve_shell: bool | None = None,
+        redact_secrets: bool | None = None,
         allow_write: bool = False,
         allow_shell: bool = False,
         dry_run: bool = False,
@@ -103,6 +105,11 @@ class AgentConfig:
                 _env_flag("CAGENT_AUTO_APPROVE_SHELL", False)
                 if auto_approve_shell is None
                 else auto_approve_shell
+            ),
+            redact_secrets=(
+                _env_flag("CAGENT_REDACT_SECRETS", True)
+                if redact_secrets is None
+                else redact_secrets
             ),
         )
 

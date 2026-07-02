@@ -21,12 +21,13 @@ from cagent.project_engine import (
     add_tool,
     create_project,
     load_project,
-    load_tasks,
     next_action,
     update_task_status,
     verify_project,
     write_final_report,
 )
+from cagent.secret_scan import format_findings, scan_workspace
+from cagent.trust import format_trust_status, trust_workspace
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,6 +57,10 @@ def main(argv: list[str] | None = None) -> int:
             return run_project_loop(args)
         if args.command == "logs":
             return run_logs(args)
+        if args.command == "secret-scan":
+            return run_secret_scan(args)
+        if args.command == "trust":
+            return run_trust(args)
         if args.command == "mcp-manifest":
             return run_mcp_manifest()
     except (LLMError, AgentProtocolError, ValueError, OSError) as exc:
@@ -156,6 +161,16 @@ def build_parser() -> argparse.ArgumentParser:
     logs.add_argument("--max-events", type=int, default=50)
     logs.add_argument("--html", help="Write an HTML view of the selected log.")
 
+    secret_scan = subparsers.add_parser("secret-scan", help="Scan workspace files for likely secrets.")
+    secret_scan.add_argument("--workspace", default=".")
+    secret_scan.add_argument("--max-files", type=int, default=1000)
+    secret_scan.add_argument("--fail-on-findings", action="store_true", help="Exit non-zero when findings are present.")
+
+    trust = subparsers.add_parser("trust", help="Trust or inspect trust status for a workspace.")
+    trust.add_argument("--workspace", default=".")
+    trust.add_argument("--status", action="store_true", help="Only print trust status.")
+    trust.add_argument("--reason", default="User explicitly trusted this workspace.")
+
     subparsers.add_parser("mcp-manifest", help="Print a JSON manifest of cagent capabilities.")
 
     return parser
@@ -175,6 +190,7 @@ def add_common_model_args(parser: argparse.ArgumentParser) -> None:
 def add_common_safety_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--command-profile", choices=VALID_COMMAND_PROFILES, help="Shell command policy profile. Default: CAGENT_COMMAND_PROFILE or inspect.")
     parser.add_argument("--auto-approve-shell", action="store_true", default=None, help="Execute approval-required shell commands after the policy allows them.")
+    parser.add_argument("--no-redact-secrets", action="store_true", help="Disable default redaction of likely secrets from tool output.")
 
 
 def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -> AgentConfig:
@@ -192,6 +208,7 @@ def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
+        redact_secrets=_redact_enabled(args),
     )
 
 
@@ -206,6 +223,8 @@ def run_doctor(args: argparse.Namespace) -> int:
     print(f"model:           {config.model}")
     print(f"command_profile: {config.command_profile}")
     print(f"auto_approve:    {config.auto_approve_shell}")
+    print(f"redact_secrets:  {config.redact_secrets}")
+    print(format_trust_status(config.workspace))
     print("profiles:")
     for line in config.model_profiles.as_lines(selected_role=config.model_role):
         print(line)
@@ -243,11 +262,15 @@ def run_agent(args: argparse.Namespace) -> int:
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
+        redact_secrets=_redact_enabled(args),
         allow_write=args.write,
         allow_shell=args.shell,
         dry_run=args.dry_run,
         log_run=args.log_run,
     )
+
+    if not config.redact_secrets:
+        print("warning: secret redaction is disabled for this run", file=sys.stderr)
 
     agent = CodingAgent(config)
     result = agent.run(goal)
@@ -319,6 +342,7 @@ def run_project_loop(args: argparse.Namespace) -> int:
         shell_timeout_seconds=args.shell_timeout,
         command_profile=args.command_profile,
         auto_approve_shell=args.auto_approve_shell,
+        redact_secrets=_redact_enabled(args),
         allow_write=args.write,
         allow_shell=args.shell,
         log_run=args.log_run,
@@ -407,9 +431,27 @@ def run_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_secret_scan(args: argparse.Namespace) -> int:
+    findings = scan_workspace(Path(args.workspace).resolve(), max_files=args.max_files)
+    print(format_findings(findings))
+    return 1 if findings and args.fail_on_findings else 0
+
+
+def run_trust(args: argparse.Namespace) -> int:
+    workspace = Path(args.workspace).resolve()
+    if not args.status:
+        trust_workspace(workspace, reason=args.reason)
+    print(format_trust_status(workspace))
+    return 0
+
+
 def run_mcp_manifest() -> int:
     print(manifest_json(), end="")
     return 0
+
+
+def _redact_enabled(args: argparse.Namespace) -> bool:
+    return not bool(getattr(args, "no_redact_secrets", False))
 
 
 if __name__ == "__main__":

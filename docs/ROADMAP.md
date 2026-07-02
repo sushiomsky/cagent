@@ -61,7 +61,7 @@ Status: implemented in `phase6/docs` and merged.
 
 ## Phase 7: Project wizard and bootstrapper
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `cagent init-project` to define a project goal, type, deliverables and definition of done.
 - Create `PROJECT_SPEC.md`, `TASKS.md`, `WORKFLOW.md`, `AGENTS.md` and `.cagent/project.json`.
@@ -69,7 +69,7 @@ Status: implemented in `phase7-15/project-engine`.
 
 ## Phase 8: Persistent project state and resume loop
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `.cagent/tasks.json`, `.cagent/decisions.jsonl`, `.cagent/artifacts.json` and `.cagent/tools.json`.
 - Add `cagent resume`, `cagent task` and `cagent loop`.
@@ -77,7 +77,7 @@ Status: implemented in `phase7-15/project-engine`.
 
 ## Phase 9: Tool manager and research notes
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `cagent tool` to register planned/available tools.
 - Add `cagent research` to create structured notes under `docs/research/`.
@@ -85,29 +85,38 @@ Status: implemented in `phase7-15/project-engine`.
 
 ## Phase 10: Multi-agent workflow roles
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `AGENTS.md` and `.cagent/workflow.json`.
 - Define planner, researcher, implementer, tester and reviewer roles with model profiles.
 
 ## Phase 11: Verification and final reports
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `cagent verify` to check required project files and task state.
 - Add `cagent final-report` to generate `FINAL_REPORT.md`.
 
 ## Phase 12: Observability and adapter foundation
 
-Status: implemented in `phase7-15/project-engine`.
+Status: implemented in `phase7-15/project-engine` and merged.
 
 - Add `cagent logs` to list, inspect and HTML-render `.cagent-runs` logs.
 - Add `cagent mcp-manifest` as a stable JSON capability manifest for future MCP/server adapters.
 
-## Phase 13: Future improvements
+## Phase 13: Secret scanning and workspace trust
+
+Status: implemented in `phase13/security-foundation`.
+
+- Add local secret scanning and formatting.
+- Redact likely secrets from tool output by default.
+- Add `cagent secret-scan` and `cagent trust`.
+- Add `.cagent/trust.json` workspace trust metadata.
+- Expose security capabilities in the manifest.
+
+## Phase 14: Future improvements
 
 - Real MCP adapter/server mode.
 - Web UI for project tasks, approvals and run logs.
-- Secret detection before context is sent to the model.
-- Workspace trust model for first-run safety.
+- Stronger secret scanning with allowlists and entropy checks.
 - Optional language-specific repo map parsers.

@@ -63,6 +63,16 @@ def build_manifest() -> dict[str, Any]:
                 "kind": "observability",
                 "description": "List, inspect and render local .cagent-runs logs.",
             },
+            {
+                "name": "secret-scan",
+                "kind": "security",
+                "description": "Scan workspace files for likely secrets before a run or commit.",
+            },
+            {
+                "name": "trust",
+                "kind": "workspace_trust",
+                "description": "Create or inspect local workspace trust metadata.",
+            },
         ],
     }
 
