@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from cagent.approval_queue import list_approval_requests, update_approval_status
+from cagent.approval_runner import build_approval_run_plans, mark_approval_handled
 from cagent.log_viewer import format_events, list_run_logs, summarize_run_log
 from cagent.project_engine import load_project, load_tasks, next_action, verify_project, write_final_report
 from cagent.secret_scan import scan_workspace
@@ -80,10 +81,13 @@ class CagentWebHandler(BaseHTTPRequestHandler):
             request_id = data.get("id", [""])[0]
             action = data.get("action", [""])[0]
             note = data.get("note", ["Reviewed from cagent web UI."])[0]
-            if action not in {"approved", "rejected"}:
+            if action not in {"approved", "rejected", "handled"}:
                 self._send_text("invalid approval action", status=HTTPStatus.BAD_REQUEST)
                 return
-            update_approval_status(self.workspace, request_id, status=action, response_note=note)
+            if action == "handled":
+                mark_approval_handled(self.workspace, request_id, note=note)
+            else:
+                update_approval_status(self.workspace, request_id, status=action, response_note=note)
             self._redirect("/")
             return
         self._send_text("not found", status=HTTPStatus.NOT_FOUND)
@@ -139,6 +143,7 @@ def status_payload(workspace: Path) -> dict[str, Any]:
     payload["trust_status"] = format_trust_status(root)
     payload["logs"] = [asdict(summarize_run_log(path)) for path in list_run_logs(root)[:20]]
     payload["approvals"] = [asdict(item) for item in list_approval_requests(root, status="all")]
+    payload["approval_plans"] = [asdict(item) for item in build_approval_run_plans(root)]
     return payload
 
 
@@ -151,6 +156,7 @@ def render_dashboard(workspace: Path) -> str:
     findings = payload.get("secret_findings") or []
     logs = payload.get("logs") or []
     approvals = payload.get("approvals") or []
+    approval_plans = payload.get("approval_plans") or []
     pending_approvals = [item for item in approvals if item.get("status") == "pending"]
 
     return page(
@@ -186,6 +192,12 @@ def render_dashboard(workspace: Path) -> str:
           <h2>Approval review</h2>
           <p class="badge {'ok' if not pending_approvals else 'warn'}">{len(pending_approvals)} pending approval(s)</p>
           {render_approvals(approvals)}
+        </section>
+
+        <section class="card">
+          <h2>Approved handling plans</h2>
+          <p class="badge {'ok' if not approval_plans else 'warn'}">{len(approval_plans)} approved plan(s)</p>
+          {render_approval_plans(approval_plans)}
         </section>
 
         <section class="card">
@@ -281,6 +293,32 @@ def render_approvals(approvals: list[dict[str, Any]]) -> str:
             "</tr>"
         )
     return "<table><thead><tr><th>ID</th><th>Status</th><th>Type</th><th>Request</th><th>Detail</th><th>Review</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def render_approval_plans(plans: list[dict[str, Any]]) -> str:
+    if not plans:
+        return "<p>No approved approval requests are ready for handling.</p>"
+    rows = []
+    for item in plans:
+        controls = (
+            f"<form method='post' action='/actions/approval' class='inline'>"
+            f"<input type='hidden' name='id' value='{e(item.get('id', ''))}' />"
+            f"<input type='hidden' name='action' value='handled' />"
+            f"<input type='hidden' name='note' value='Marked handled from cagent web UI.' />"
+            f"<button type='submit'>Mark handled</button>"
+            f"</form>"
+        )
+        rows.append(
+            "<tr>"
+            f"<td><code>{e(item.get('id', ''))}</code></td>"
+            f"<td>{e(item.get('action_type', ''))}</td>"
+            f"<td>{e(item.get('title', ''))}<br><small>{e(item.get('reason', ''))}</small></td>"
+            f"<td><code>{e(item.get('detail', ''))}</code></td>"
+            f"<td>{e(item.get('next_step', ''))}</td>"
+            f"<td>{controls}</td>"
+            "</tr>"
+        )
+    return "<table><thead><tr><th>ID</th><th>Type</th><th>Plan</th><th>Detail</th><th>Next</th><th>Handled</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
 
 
 def render_findings(findings: list[dict[str, Any]]) -> str:
