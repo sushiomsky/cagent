@@ -52,16 +52,55 @@ Status: implemented in `phase5/approval-safety` and merged.
 
 ## Phase 6: Integrations
 
-Status: implemented in `phase6/docs`.
+Status: implemented in `phase6/docs` and merged.
 
 - Add client integration guide for cagent, OpenAI-compatible clients and OpenWebUI.
 - Add Tesla T4 + Tailscale + Ollama deployment guide.
 - Document local endpoint conventions, model profiles and smoke tests.
 - Link integration docs from the README.
 
-## Phase 7: Future improvements
+## Phase 7: Project wizard and bootstrapper
 
-- Simple web UI for run logs and approvals.
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `cagent init-project` to define a project goal, type, deliverables and definition of done.
+- Create `PROJECT_SPEC.md`, `TASKS.md`, `WORKFLOW.md`, `AGENTS.md` and `.cagent/project.json`.
+- Initialize project directories, git and lightweight hooks.
+
+## Phase 8: Persistent project state and resume loop
+
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `.cagent/tasks.json`, `.cagent/decisions.jsonl`, `.cagent/artifacts.json` and `.cagent/tools.json`.
+- Add `cagent resume`, `cagent task` and `cagent loop`.
+- Run one loop iteration against the next project task.
+
+## Phase 9: Tool manager and research notes
+
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `cagent tool` to register planned/available tools.
+- Add `cagent research` to create structured notes under `docs/research/`.
+- Record decisions as JSONL events.
+
+## Phase 10: Multi-agent workflow roles
+
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `AGENTS.md` and `.cagent/workflow.json`.
+- Define planner, researcher, implementer, tester and reviewer roles with model profiles.
+
+## Phase 11: Verification and final reports
+
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `cagent verify` to check required project files and task state.
+- Add `cagent final-report` to generate `FINAL_REPORT.md`.
+
+## Phase 12: Future improvements
+
+- Real MCP adapter/server mode.
+- Web UI for run logs, tasks and approvals.
 - Secret detection before context is sent to the model.
 - Workspace trust model for first-run safety.
 - Optional language-specific repo map parsers.
