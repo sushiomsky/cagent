@@ -181,7 +181,7 @@ Status: implemented in `phase20/approval-runner-foundation` and merged.
 
 ## Phase 21: Web approval plans
 
-Status: implemented in `phase21/web-approval-plans`.
+Status: implemented in `phase21/web-approval-plans` and merged.
 
 - Show approved handling plans in `cagent serve-web`.
 - Include approval plans in `/api/status`.
@@ -189,8 +189,18 @@ Status: implemented in `phase21/web-approval-plans`.
 - Keep plan review status-only.
 - Add docs and tests.
 
-## Phase 22: Future improvements
+## Phase 22: Python AST repo map
+
+Status: implemented in `phase22/python-ast-repomap`.
+
+- Add Python AST-based symbol extraction for repo maps.
+- Include class methods and async functions with qualified names.
+- Add AST import extraction for Python files.
+- Keep regex fallback for invalid Python files.
+- Add docs and tests.
+
+## Phase 23: Future improvements
 
 - Full SDK-backed MCP server mode.
-- Optional language-specific repo map parsers.
+- Optional AST parsers for more languages.
 - Add more narrow reviewed status workflows.

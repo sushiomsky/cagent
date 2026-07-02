@@ -39,6 +39,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 ## Documentation
 
 - [Client integration guide](docs/CLIENTS.md)
+- [Repo map and context packs](docs/REPO_MAP.md)
 - [Tesla T4 + Tailscale + Ollama deployment guide](docs/T4_TAILSCALE_OLLAMA.md)
 - [Roadmap](docs/ROADMAP.md)
 
@@ -268,7 +269,7 @@ The model can request these tools through the JSON action loop:
 
 ## Context strategy
 
-For non-trivial repos the agent should start with `repo_map` or `context_pack` instead of reading many files blindly. The first implementation intentionally uses dependency-free regex heuristics rather than AST parsers or Tree-sitter. It detects common symbols and imports across Python, JavaScript/TypeScript, Go, Rust, PHP, shell and config/documentation files.
+For non-trivial repos the agent should start with `repo_map` or `context_pack` instead of reading many files blindly. Python files use standard-library AST parsing for classes, methods, functions, async functions and imports, with a regex fallback for incomplete files. Other languages still use dependency-free regex heuristics. See [Repo map and context packs](docs/REPO_MAP.md).
 
 ## Safety model
 

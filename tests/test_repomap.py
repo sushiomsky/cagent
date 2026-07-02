@@ -19,6 +19,41 @@ def test_build_repo_map_extracts_python_symbols_and_imports(tmp_path):
     assert files[0].score > 0
 
 
+def test_python_ast_symbols_include_methods_and_async_functions(tmp_path):
+    source = tmp_path / "service.py"
+    source.write_text(
+        "from .models import User\n\n"
+        "class AccountService:\n"
+        "    def create_user(self):\n"
+        "        return User()\n"
+        "    async def refresh_user(self):\n"
+        "        return None\n\n"
+        "async def background_refresh():\n"
+        "    return None\n",
+        encoding="utf-8",
+    )
+
+    files = build_repo_map(tmp_path, query="refresh AccountService", max_files=10)
+
+    symbols = files[0].symbols
+    assert "AccountService" in symbols
+    assert "AccountService.create_user" in symbols
+    assert "AccountService.refresh_user" in symbols
+    assert "background_refresh" in symbols
+    assert any(".models import User" in item for item in files[0].imports)
+    assert files[0].score > 0
+
+
+def test_python_ast_falls_back_to_regex_on_syntax_error(tmp_path):
+    source = tmp_path / "broken.py"
+    source.write_text("def still_visible():\n    return (\n", encoding="utf-8")
+
+    files = build_repo_map(tmp_path, query="still_visible", max_files=10)
+
+    assert files[0].path == "broken.py"
+    assert "still_visible" in files[0].symbols
+
+
 def test_repo_map_ranks_query_matches(tmp_path):
     (tmp_path / "auth_service.py").write_text("def login_user():\n    pass\n", encoding="utf-8")
     (tmp_path / "billing.py").write_text("def invoice():\n    pass\n", encoding="utf-8")

@@ -1,12 +1,13 @@
 """Repository map and context packing helpers.
 
 This module intentionally avoids heavyweight parser dependencies. It gives the
-agent a useful first-pass overview by combining filename ranking, simple import
-extraction and regex-based symbol discovery.
+agent a useful first-pass overview by combining filename ranking, lightweight
+Python AST inspection, simple import extraction and regex-based symbol discovery.
 """
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 from dataclasses import dataclass
@@ -79,7 +80,7 @@ IMPORT_PATTERNS = [
     re.compile(r"^\s*(?:import|export)\s+.+?\s+from\s+['\"]([^'\"]+)['\"]"),
     re.compile(r"^\s*const\s+.+?=\s+require\(['\"]([^'\"]+)['\"]\)"),
     re.compile(r"^\s*use\s+([^;]+);"),
-    re.compile(r"^\s*require_once\s+[""']([^""']+)[""']"),
+    re.compile(r"^\s*require_once\s+[\"']([^\"']+)[\"']"),
 ]
 
 
@@ -205,9 +206,9 @@ def format_context_pack(pack: ContextPack) -> str:
 def _inspect_file(file_path: Path, *, relative: str, query_terms: set[str]) -> RepoFile:
     text = file_path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
-    symbols = _extract_symbols(lines)
-    imports = _extract_imports(lines)
     language = LANGUAGE_BY_SUFFIX.get(file_path.suffix.lower(), file_path.suffix.lower().lstrip(".") or "text")
+    symbols = _extract_python_symbols(text) if language == "python" else _extract_symbols(lines)
+    imports = _extract_python_imports(text) if language == "python" else _extract_imports(lines)
     score = _score_file(relative=relative, text=text, symbols=symbols, imports=imports, query_terms=query_terms)
     return RepoFile(
         path=relative,
@@ -218,6 +219,48 @@ def _inspect_file(file_path: Path, *, relative: str, query_terms: set[str]) -> R
         imports=imports,
         score=score,
     )
+
+
+def _extract_python_symbols(text: str, *, limit: int = 30) -> list[str]:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return _extract_symbols(text.splitlines(), limit=limit)
+
+    symbols: list[tuple[int, str]] = []
+
+    def visit_body(body: list[ast.stmt], prefix: str = "") -> None:
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                name = f"{prefix}{node.name}"
+                symbols.append((node.lineno, name))
+                visit_body(node.body, prefix=f"{name}.")
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                name = f"{prefix}{node.name}"
+                symbols.append((node.lineno, name))
+
+    visit_body(tree.body)
+    symbols.sort(key=lambda item: item[0])
+    return _unique([name for _, name in symbols], limit=limit)
+
+
+def _extract_python_imports(text: str, *, limit: int = 30) -> list[str]:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return _extract_imports(text.splitlines(), limit=limit)
+
+    imports: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append((node.lineno, alias.name))
+        elif isinstance(node, ast.ImportFrom):
+            module = "." * node.level + (node.module or "")
+            names = ", ".join(alias.name for alias in node.names)
+            imports.append((node.lineno, f"{module} import {names}".strip()))
+    imports.sort(key=lambda item: item[0])
+    return _unique([value for _, value in imports], limit=limit)
 
 
 def _extract_symbols(lines: list[str], *, limit: int = 30) -> list[str]:
@@ -279,6 +322,16 @@ def _score_file(
 
 def _query_terms(query: str) -> set[str]:
     return {term.lower() for term in re.findall(r"[A-Za-z0-9_./-]+", query) if len(term) >= 2}
+
+
+def _unique(values: list[str], *, limit: int) -> list[str]:
+    found: list[str] = []
+    for value in values:
+        if value and value not in found:
+            found.append(value)
+        if len(found) >= limit:
+            break
+    return found
 
 
 def _iter_candidate_files(root: Path) -> list[Path]:
