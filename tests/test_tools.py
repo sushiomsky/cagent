@@ -4,13 +4,23 @@ from pathlib import Path
 from cagent.tools import WorkspaceTools
 
 
-def make_tools(tmp_path: Path, *, write: bool = True, shell: bool = False, dry_run: bool = False) -> WorkspaceTools:
+def make_tools(
+    tmp_path: Path,
+    *,
+    write: bool = True,
+    shell: bool = False,
+    dry_run: bool = False,
+    command_profile: str = "inspect",
+    auto_approve_shell: bool = False,
+) -> WorkspaceTools:
     return WorkspaceTools(
         workspace=tmp_path,
         allow_write=write,
         allow_shell=shell,
         dry_run=dry_run,
         shell_timeout_seconds=5,
+        command_profile=command_profile,
+        auto_approve_shell=auto_approve_shell,
     )
 
 
@@ -110,12 +120,33 @@ def test_shell_disabled_by_default(tmp_path):
     assert "Shell access is disabled" in result.output
 
 
-def test_shell_blocks_dangerous_command(tmp_path):
-    tools = make_tools(tmp_path, shell=True)
+def test_shell_blocks_policy_denied_command(tmp_path):
+    tools = make_tools(tmp_path, shell=True, command_profile="inspect")
 
-    result = tools.run_shell(command="rm -rf /")
+    result = tools.run_shell(command="pytest -q")
     assert not result.ok
-    assert "Blocked dangerous command" in result.output
+    assert "Blocked by command profile" in result.output
+
+
+def test_shell_requires_approval_for_write_command(tmp_path):
+    tools = make_tools(tmp_path, shell=True, command_profile="edit")
+
+    result = tools.run_shell(command="touch generated.txt")
+    assert not result.ok
+    assert "requires approval" in result.output
+
+
+def test_shell_auto_approve_runs_policy_allowed_command(tmp_path):
+    tools = make_tools(
+        tmp_path,
+        shell=True,
+        command_profile="edit",
+        auto_approve_shell=True,
+    )
+
+    result = tools.run_shell(command="touch generated.txt")
+    assert result.ok
+    assert (tmp_path / "generated.txt").exists()
 
 
 def test_search_text(tmp_path):
