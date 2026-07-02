@@ -1,6 +1,6 @@
 # cagent
 
-`cagent` is a small self-hosted coding agent for local or private OpenAI-compatible model backends.
+`cagent` is a small self-hosted coding and project agent for local or private OpenAI-compatible model backends.
 
 The default target setup is a local CLI talking to a proxied model endpoint, for example:
 
@@ -23,6 +23,8 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - workspace-scoped file access
 - guarded shell execution with timeout and command profiles
 - repo map and context pack tools
+- project wizard/bootstrapper with `.cagent` state
+- task board, tool registry, research notes, artifacts and final reports
 - patch-based edits via `git apply`
 - git status/diff review tool
 - optional local JSONL run logs
@@ -135,6 +137,50 @@ export CAGENT_LOG_RUNS=1
 
 Logs are written to `.cagent-runs/*.jsonl` and may contain model responses, tool arguments and tool output.
 
+## Project wizard and workflow engine
+
+Create a general project, not only a coding task:
+
+```bash
+cagent init-project \
+  --workspace ./my-agent-project \
+  --name "My Agent Project" \
+  --type llm_agent \
+  --goal "Build a local tool-using agent that can finish project tasks." \
+  --deliverable README.md \
+  --deliverable FINAL_REPORT.md \
+  --allow-shell \
+  --allow-network
+```
+
+This creates:
+
+```text
+PROJECT_SPEC.md
+TASKS.md
+WORKFLOW.md
+AGENTS.md
+FINAL_REPORT.md       # generated later
+.cagent/project.json
+.cagent/tasks.json
+.cagent/workflow.json
+.cagent/tools.json
+.cagent/artifacts.json
+.cagent/decisions.jsonl
+```
+
+Continue work from project state:
+
+```bash
+cagent resume --workspace ./my-agent-project
+cagent loop --workspace ./my-agent-project --write --shell --command-profile test
+cagent task --workspace ./my-agent-project --id T001 --status verified
+cagent tool --workspace ./my-agent-project --name ripgrep --purpose "Fast text search" --status available
+cagent research --workspace ./my-agent-project --topic "Model choice" --source manual --summary "14B coder is default."
+cagent verify --workspace ./my-agent-project
+cagent final-report --workspace ./my-agent-project --notes "Ready for review."
+```
+
 ## Doctor
 
 ```bash
@@ -208,3 +254,6 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] approval and command profiles for shell actions
 - [x] client integration docs
 - [x] Tailscale/Ollama/T4 deployment guide
+- [x] project wizard/bootstrapper
+- [x] persistent task state and resume loop
+- [x] tool registry, research notes, verification and final report
