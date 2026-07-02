@@ -40,6 +40,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 
 - [Client integration guide](docs/CLIENTS.md)
 - [Tesla T4 + Tailscale + Ollama deployment guide](docs/T4_TAILSCALE_OLLAMA.md)
+- [Quality gates](docs/QUALITY.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Recommended model profiles for a Tesla T4
@@ -71,6 +72,22 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env
+```
+
+## Quality checks
+
+Run the same quality gate locally that CI uses:
+
+```bash
+make check
+```
+
+This runs bytecode compilation, linting and tests. Individual targets are also available:
+
+```bash
+make compile
+make lint
+make test
 ```
 
 ## Run a local model endpoint
@@ -300,3 +317,5 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] tool registry, research notes, verification and final report
 - [x] run-log viewer and MCP-style manifest export
 - [x] local secret scanning, redaction and workspace trust
+- [x] approval queue, web review and status-only handling plans
+- [x] quality gates for compile, lint and tests
