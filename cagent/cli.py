@@ -11,6 +11,8 @@ from cagent.agent import AgentProtocolError, CodingAgent
 from cagent.command_policy import VALID_COMMAND_PROFILES
 from cagent.config import AgentConfig
 from cagent.llm import LLMError, OpenAICompatibleClient
+from cagent.log_viewer import format_events, format_summary, list_run_logs, render_html, summarize_run_log
+from cagent.mcp_manifest import manifest_json
 from cagent.model_router import VALID_MODEL_ROLES
 from cagent.project_engine import (
     PROJECT_TYPES,
@@ -52,6 +54,10 @@ def main(argv: list[str] | None = None) -> int:
             return run_final_report(args)
         if args.command == "loop":
             return run_project_loop(args)
+        if args.command == "logs":
+            return run_logs(args)
+        if args.command == "mcp-manifest":
+            return run_mcp_manifest()
     except (LLMError, AgentProtocolError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -84,12 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--write", action="store_true", help="Allow file writes and patch application inside the workspace.")
     run.add_argument("--shell", action="store_true", help="Allow guarded shell commands inside the workspace.")
     run.add_argument("--dry-run", action="store_true", help="Show intended writes/commands without executing them.")
-    run.add_argument(
-        "--log-run",
-        action="store_true",
-        default=None,
-        help="Write a JSONL run log under .cagent-runs/.",
-    )
+    run.add_argument("--log-run", action="store_true", default=None, help="Write a JSONL run log under .cagent-runs/.")
     run.add_argument("--show-tool-output", action="store_true", help="Print full tool output after each step.")
 
     init = subparsers.add_parser("init-project", help="Create project spec, workflow, tasks, tools and hooks.")
@@ -148,48 +149,32 @@ def build_parser() -> argparse.ArgumentParser:
     final_report.add_argument("--workspace", default=".")
     final_report.add_argument("--notes", default="")
 
+    logs = subparsers.add_parser("logs", help="List, show or render local .cagent-runs logs.")
+    logs.add_argument("--workspace", default=".")
+    logs.add_argument("--show", help="Log filename/path to print. Use --latest for the newest log.")
+    logs.add_argument("--latest", action="store_true", help="Use the newest log for --show/--html.")
+    logs.add_argument("--max-events", type=int, default=50)
+    logs.add_argument("--html", help="Write an HTML view of the selected log.")
+
+    subparsers.add_parser("mcp-manifest", help="Print a JSON manifest of cagent capabilities.")
+
     return parser
 
 
 def add_common_model_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--base-url",
-        help="OpenAI-compatible base URL. Default: CAGENT_BASE_URL or http://127.0.0.1:18080/v1",
-    )
-    parser.add_argument(
-        "--model",
-        help="Default model profile. Default: CAGENT_MODEL or qwen2.5-coder:14b-instruct-q4_K_M",
-    )
-    parser.add_argument(
-        "--fast-model",
-        help="Fast model profile. Default: CAGENT_FAST_MODEL or qwen2.5-coder:7b-instruct-q4_K_M",
-    )
-    parser.add_argument(
-        "--reviewer-model",
-        help="Reviewer model profile. Default: CAGENT_REVIEWER_MODEL or qwen3-coder:30b-a3b-q4_K_M",
-    )
-    parser.add_argument(
-        "--model-role",
-        choices=VALID_MODEL_ROLES,
-        help="Model profile to use for this command. Default: CAGENT_MODEL_ROLE or default.",
-    )
+    parser.add_argument("--base-url", help="OpenAI-compatible base URL. Default: CAGENT_BASE_URL or http://127.0.0.1:18080/v1")
+    parser.add_argument("--model", help="Default model profile. Default: CAGENT_MODEL or qwen2.5-coder:14b-instruct-q4_K_M")
+    parser.add_argument("--fast-model", help="Fast model profile. Default: CAGENT_FAST_MODEL or qwen2.5-coder:7b-instruct-q4_K_M")
+    parser.add_argument("--reviewer-model", help="Reviewer model profile. Default: CAGENT_REVIEWER_MODEL or qwen3-coder:30b-a3b-q4_K_M")
+    parser.add_argument("--model-role", choices=VALID_MODEL_ROLES, help="Model profile to use for this command. Default: CAGENT_MODEL_ROLE or default.")
     parser.add_argument("--temperature", type=float, help="Model temperature. Default: 0.15")
     parser.add_argument("--request-timeout", type=int, help="HTTP request timeout in seconds.")
     parser.add_argument("--shell-timeout", type=int, help="Shell command timeout in seconds.")
 
 
 def add_common_safety_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--command-profile",
-        choices=VALID_COMMAND_PROFILES,
-        help="Shell command policy profile. Default: CAGENT_COMMAND_PROFILE or inspect.",
-    )
-    parser.add_argument(
-        "--auto-approve-shell",
-        action="store_true",
-        default=None,
-        help="Execute approval-required shell commands after the policy allows them.",
-    )
+    parser.add_argument("--command-profile", choices=VALID_COMMAND_PROFILES, help="Shell command policy profile. Default: CAGENT_COMMAND_PROFILE or inspect.")
+    parser.add_argument("--auto-approve-shell", action="store_true", default=None, help="Execute approval-required shell commands after the policy allows them.")
 
 
 def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -> AgentConfig:
@@ -212,11 +197,7 @@ def build_config_from_args(args: argparse.Namespace, *, workspace: str | Path) -
 
 def run_doctor(args: argparse.Namespace) -> int:
     config = build_config_from_args(args, workspace=args.workspace)
-    client = OpenAICompatibleClient(
-        base_url=config.base_url,
-        model=config.model,
-        timeout_seconds=config.request_timeout_seconds,
-    )
+    client = OpenAICompatibleClient(base_url=config.base_url, model=config.model, timeout_seconds=config.request_timeout_seconds)
     models = client.list_models()
 
     print(f"workspace:       {config.workspace}")
@@ -310,8 +291,7 @@ def run_init_project(args: argparse.Namespace) -> int:
 
 
 def run_resume(args: argparse.Namespace) -> int:
-    workspace = Path(args.workspace).resolve()
-    print(next_action(workspace))
+    print(next_action(Path(args.workspace).resolve()))
     return 0
 
 
@@ -375,13 +355,7 @@ def run_tool(args: argparse.Namespace) -> int:
 
 
 def run_research(args: argparse.Namespace) -> int:
-    path = add_research_note(
-        Path(args.workspace).resolve(),
-        topic=args.topic,
-        source=args.source,
-        summary=args.summary,
-        decision=args.decision,
-    )
+    path = add_research_note(Path(args.workspace).resolve(), topic=args.topic, source=args.source, summary=args.summary, decision=args.decision)
     print(f"research note: {path}")
     return 0
 
@@ -401,6 +375,40 @@ def run_verify(args: argparse.Namespace) -> int:
 def run_final_report(args: argparse.Namespace) -> int:
     path = write_final_report(Path(args.workspace).resolve(), notes=args.notes)
     print(f"final report: {path}")
+    return 0
+
+
+def run_logs(args: argparse.Namespace) -> int:
+    workspace = Path(args.workspace).resolve()
+    logs = list_run_logs(workspace)
+    if not logs:
+        print("No run logs found.")
+        return 0
+
+    selected: Path | None = None
+    if args.latest:
+        selected = logs[0]
+    elif args.show:
+        candidate = Path(args.show)
+        selected = candidate if candidate.is_absolute() else workspace / ".cagent-runs" / candidate
+
+    if args.html:
+        selected = selected or logs[0]
+        Path(args.html).write_text(render_html(selected), encoding="utf-8")
+        print(f"html: {args.html}")
+        return 0
+
+    if selected:
+        print(format_events(selected, max_events=args.max_events))
+        return 0
+
+    for path in logs:
+        print(format_summary(summarize_run_log(path)))
+    return 0
+
+
+def run_mcp_manifest() -> int:
+    print(manifest_json(), end="")
     return 0
 
 
