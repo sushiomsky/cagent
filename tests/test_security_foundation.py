@@ -1,6 +1,17 @@
-from pathlib import Path
+import json
+import re
 
-from cagent.secret_scan import format_findings, redact_text, scan_text, scan_workspace
+from cagent.secret_scan import (
+    SecretAllowlist,
+    findings_json,
+    format_findings,
+    load_allowlist,
+    redact_text,
+    scan_text,
+    scan_workspace,
+    shannon_entropy,
+    sorted_findings,
+)
 from cagent.tools import WorkspaceTools
 from cagent.trust import format_trust_status, is_trusted, load_trust, trust_workspace
 
@@ -12,6 +23,8 @@ def test_secret_scan_detects_and_redacts_env_secret_assignment():
 
     assert len(findings) == 1
     assert findings[0].kind == "env_secret_assignment"
+    assert findings[0].severity == "medium"
+    assert findings[0].entropy > 2.6
     assert "<REDACTED:env_secret_assignment>" in redact_text(text)
     assert "Likely secrets" in format_findings(findings)
 
@@ -24,6 +37,45 @@ def test_scan_workspace_skips_binary_and_reports_text_findings(tmp_path):
 
     assert len(findings) == 1
     assert findings[0].path == ".env"
+
+
+def test_secret_allowlist_filters_matching_lines(tmp_path):
+    (tmp_path / ".env").write_text("TOKEN=1234567890abcdef\n", encoding="utf-8")
+    (tmp_path / ".cagent-secret-allowlist").write_text(r"TOKEN=1234567890abcdef" + "\n", encoding="utf-8")
+
+    findings = scan_workspace(tmp_path)
+
+    assert findings == []
+    assert load_allowlist(tmp_path).patterns
+
+
+def test_allowlist_can_be_passed_to_scan_text():
+    text = "TOKEN=1234567890abcdef\n"
+    allowlist = SecretAllowlist(patterns=())
+
+    assert scan_text(text, path=".env", allowlist=allowlist)
+    assert not scan_text(text, path=".env", allowlist=SecretAllowlist(patterns=(re.compile("TOKEN="),)))
+
+
+def test_findings_json_is_machine_readable():
+    findings = scan_text("TOKEN=1234567890abcdef\n", path=".env")
+
+    parsed = json.loads(findings_json(findings))
+
+    assert parsed[0]["path"] == ".env"
+    assert parsed[0]["severity"] == "medium"
+    assert parsed[0]["entropy"] > 2.6
+
+
+def test_entropy_filters_low_entropy_placeholders():
+    assert shannon_entropy("aaaaaaaaaaaaaaaa") == 0
+    assert not scan_text("TOKEN=aaaaaaaaaaaaaaaa\n", path=".env")
+
+
+def test_critical_findings_sort_before_medium():
+    findings = scan_text("TOKEN=1234567890abcdef\nsk-abcdefghijklmnopqrstuvwxyz012345\n", path=".env")
+
+    assert sorted_findings(findings)[0].severity == "critical"
 
 
 def test_workspace_tools_redact_file_output_by_default(tmp_path):

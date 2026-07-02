@@ -125,16 +125,25 @@ Status: implemented in `phase14/stdio-adapter` and merged.
 
 ## Phase 15: Local web UI
 
-Status: implemented in `phase15/web-ui`.
+Status: implemented in `phase15/web-ui` and merged.
 
 - Add `cagent serve-web`.
 - Add a dependency-free local dashboard for project, tasks, verification, security, trust and run logs.
 - Add JSON status endpoint and light actions for workspace trust and final report generation.
 - Add web UI docs and tests.
 
-## Phase 16: Future improvements
+## Phase 16: Secret scanning quality
+
+Status: implemented in `phase16/secret-quality`.
+
+- Add severity to findings.
+- Add entropy scoring and filtering for noisy placeholder values.
+- Add workspace allowlist files.
+- Add machine-readable `findings_json` helper.
+- Add docs and tests.
+
+## Phase 17: Future improvements
 
 - Full SDK-backed MCP server mode.
-- Stronger secret scanning with allowlists and entropy checks.
 - Optional language-specific repo map parsers.
 - Rich approval queues for project/task actions.
