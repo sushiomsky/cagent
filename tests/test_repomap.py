@@ -19,6 +19,26 @@ def test_build_repo_map_extracts_python_symbols_and_imports(tmp_path):
     assert files[0].score > 0
 
 
+def test_python_ast_repo_map_adds_line_ranges_and_methods(tmp_path):
+    source = tmp_path / "service.py"
+    source.write_text(
+        "from pathlib import Path\n\nclass Service:\n    def run(self):\n        return Path.cwd()\n\nasync def boot():\n    return Service()\n",
+        encoding="utf-8",
+    )
+
+    file_info = build_repo_map(tmp_path, query="service boot", max_files=10)[0]
+    output = format_repo_map([file_info])
+
+    assert "Service" in file_info.symbols
+    assert "Service.run" in file_info.symbols
+    assert "boot" in file_info.symbols
+    assert file_info.symbol_ranges["Service"].startswith("3-")
+    assert file_info.symbol_ranges["Service.run"].startswith("4-")
+    assert file_info.symbol_ranges["boot"].startswith("7-")
+    assert "Service@" in output
+    assert "Service.run@" in output
+
+
 def test_repo_map_ranks_query_matches(tmp_path):
     (tmp_path / "auth_service.py").write_text("def login_user():\n    pass\n", encoding="utf-8")
     (tmp_path / "billing.py").write_text("def invoice():\n    pass\n", encoding="utf-8")
@@ -48,6 +68,7 @@ def test_context_pack_contains_selected_file_content(tmp_path):
     assert len(pack.files) == 1
     assert pack.files[0].path == "agent.py"
     assert "--- FILE: agent.py" in output
+    assert "symbols: CodingAgent@" in output
     assert "class CodingAgent" in output
 
 
