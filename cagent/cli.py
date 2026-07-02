@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from cagent import __version__
 from cagent.agent import AgentProtocolError, CodingAgent
@@ -48,6 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "doctor":
             return run_doctor(args)
+        if args.command == "config":
+            return run_config(args)
         if args.command == "run":
             return run_agent(args)
         if args.command == "init-project":
@@ -101,6 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_model_args(doctor)
     add_common_safety_args(doctor)
     doctor.add_argument("--workspace", default=".")
+
+    config = subparsers.add_parser("config", help="Show resolved runtime config without contacting the model endpoint.")
+    add_common_model_args(config)
+    add_common_safety_args(config)
+    config.add_argument("--workspace", default=".")
+    config.add_argument("--json", action="store_true")
 
     run = subparsers.add_parser("run", help="Run the coding agent.")
     add_common_model_args(run)
@@ -303,6 +312,16 @@ def run_doctor(args: argparse.Namespace) -> int:
     for model in models:
         marker = "*" if model == config.model else "-"
         print(f"  {marker} {model}")
+    return 0
+
+
+def run_config(args: argparse.Namespace) -> int:
+    config = build_config_from_args(args, workspace=args.workspace)
+    payload = config_payload(config)
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(format_config_payload(payload))
     return 0
 
 
@@ -551,6 +570,61 @@ def run_approval(args: argparse.Namespace) -> int:
 def run_mcp_manifest() -> int:
     print(manifest_json(), end="")
     return 0
+
+
+def config_payload(config: AgentConfig) -> dict[str, Any]:
+    return {
+        "workspace": str(config.workspace),
+        "base_url": config.base_url,
+        "model_role": config.model_role,
+        "model": config.model,
+        "model_profiles": {
+            "default": config.model_profiles.default,
+            "fast": config.model_profiles.fast,
+            "reviewer": config.model_profiles.reviewer,
+        },
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
+        "max_steps": config.max_steps,
+        "request_timeout_seconds": config.request_timeout_seconds,
+        "request_retries": config.request_retries,
+        "retry_backoff_seconds": config.retry_backoff_seconds,
+        "shell_timeout_seconds": config.shell_timeout_seconds,
+        "command_profile": config.command_profile,
+        "auto_approve_shell": config.auto_approve_shell,
+        "redact_secrets": config.redact_secrets,
+        "allow_write": config.allow_write,
+        "allow_shell": config.allow_shell,
+        "dry_run": config.dry_run,
+        "log_run": config.log_run,
+    }
+
+
+def format_config_payload(payload: dict[str, Any]) -> str:
+    profiles = payload["model_profiles"]
+    lines = [
+        f"workspace:               {payload['workspace']}",
+        f"base_url:                {payload['base_url']}",
+        f"model_role:              {payload['model_role']}",
+        f"model:                   {payload['model']}",
+        f"fast_model:              {profiles['fast']}",
+        f"reviewer_model:          {profiles['reviewer']}",
+        f"temperature:             {payload['temperature']}",
+        f"max_tokens:              {payload['max_tokens']}",
+        f"max_steps:               {payload['max_steps']}",
+        f"request_timeout_seconds: {payload['request_timeout_seconds']}",
+        f"request_retries:         {payload['request_retries']}",
+        f"retry_backoff_seconds:   {payload['retry_backoff_seconds']}",
+        f"shell_timeout_seconds:   {payload['shell_timeout_seconds']}",
+        f"command_profile:         {payload['command_profile']}",
+        f"auto_approve_shell:      {payload['auto_approve_shell']}",
+        f"redact_secrets:          {payload['redact_secrets']}",
+        f"allow_write:             {payload['allow_write']}",
+        f"allow_shell:             {payload['allow_shell']}",
+        f"dry_run:                 {payload['dry_run']}",
+        f"log_run:                 {payload['log_run']}",
+    ]
+    return "\n".join(lines)
 
 
 def _redact_enabled(args: argparse.Namespace) -> bool:
