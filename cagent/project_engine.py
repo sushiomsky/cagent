@@ -84,16 +84,11 @@ AGENT_ROLE_TEMPLATES = [
     },
 ]
 
-WORKFLOW_STAGES = [
-    "intake",
-    "research",
-    "plan",
-    "bootstrap",
-    "implement",
-    "test",
-    "review",
-    "finalize",
-]
+WORKFLOW_STAGES = ["intake", "research", "plan", "bootstrap", "implement", "test", "review", "finalize"]
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -196,10 +191,9 @@ def create_project(
     """Create or update the persistent project scaffolding."""
 
     selected_type = normalize_project_type(project_type)
-    slug = slugify(name)
     spec = ProjectSpec(
         name=name,
-        slug=slug,
+        slug=slugify(name),
         project_type=selected_type,
         goal=goal,
         deliverables=deliverables or default_deliverables(selected_type),
@@ -288,7 +282,9 @@ def default_tools(spec: ProjectSpec) -> list[ToolItem]:
         ToolItem("ripgrep", "Fast code and text search", "recommended", "", "project"),
     ]
     if spec.allowed_actions.get("research"):
-        tools.append(ToolItem("research_notes", "Structured source notes under docs/research/", "available", risk="project"))
+        tools.append(
+            ToolItem("research_notes", "Structured source notes under docs/research/", "available", risk="project")
+        )
     if spec.project_type in {"software_project", "cli_tool", "llm_agent", "web_app"}:
         tools.append(ToolItem("pytest", "Python test runner when Python is used", "optional", "pip install pytest", "project"))
     return tools
@@ -302,8 +298,9 @@ def default_artifacts(spec: ProjectSpec) -> list[ArtifactItem]:
         ArtifactItem("AGENTS.md", "agent_roles", "draft", "planner", "Role definitions for cagent and other agents."),
         ArtifactItem("FINAL_REPORT.md", "final_report", "planned", "planner", "Final delivery report."),
     ]
+    existing = {item.path for item in artifacts}
     for path in spec.deliverables:
-        if path not in {item.path for item in artifacts}:
+        if path not in existing:
             artifacts.append(ArtifactItem(path, "deliverable", "planned", "planner", "Requested deliverable."))
     return artifacts
 
@@ -504,8 +501,7 @@ def normalize_task_status(status: str) -> TaskStatus:
 def add_tool(root: Path, tool: ToolItem) -> None:
     paths = project_paths(root)
     data = read_json(paths.tools_json) if paths.tools_json.exists() else {"tools": []}
-    tools = data.get("tools", [])
-    tools = [item for item in tools if item.get("name") != tool.name]
+    tools = [item for item in data.get("tools", []) if item.get("name") != tool.name]
     tools.append(asdict(tool))
     write_json(paths.tools_json, {"tools": tools})
     append_jsonl(paths.decisions_jsonl, {"time": _now(), "type": "tool_registered", "tool": asdict(tool)})
@@ -514,8 +510,7 @@ def add_tool(root: Path, tool: ToolItem) -> None:
 def add_research_note(root: Path, *, topic: str, source: str, summary: str, decision: str = "") -> Path:
     paths = project_paths(root)
     paths.research_dir.mkdir(parents=True, exist_ok=True)
-    filename = slugify(topic) + ".md"
-    path = paths.research_dir / filename
+    path = paths.research_dir / f"{slugify(topic)}.md"
     block = "\n".join(
         [
             f"# Research: {topic}",
@@ -549,7 +544,6 @@ def verify_project(root: Path) -> VerificationResult:
     checks: list[str] = []
     missing: list[str] = []
     warnings: list[str] = []
-
     required_files = [
         paths.project_json,
         paths.tasks_json,
@@ -659,8 +653,5 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 def append_jsonl(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.open("a", encoding="utf-8").write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
