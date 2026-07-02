@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from cagent.command_policy import evaluate_command, normalize_command_profile
 from cagent.repomap import build_context_pack, build_repo_map, format_context_pack, format_repo_map
 
 
@@ -27,18 +28,6 @@ SKIPPED_DIRS = {
     "dist",
     "build",
 }
-
-DANGEROUS_COMMAND_PATTERNS = [
-    r"\brm\s+-rf\s+/(\s|$)",
-    r"\brm\s+-rf\s+~(\s|$)",
-    r"\bdd\s+if=",
-    r"\bmkfs\b",
-    r"\bshutdown\b",
-    r"\breboot\b",
-    r":\s*\(\)\s*\{",
-    r"\bchmod\s+-R\s+777\s+/(\s|$)",
-    r"\bchown\s+-R\b.*\s+/(\s|$)",
-]
 
 
 @dataclass(frozen=True)
@@ -64,12 +53,16 @@ class WorkspaceTools:
         allow_shell: bool,
         dry_run: bool,
         shell_timeout_seconds: int,
+        command_profile: str = "inspect",
+        auto_approve_shell: bool = False,
     ) -> None:
         self.workspace = workspace.resolve()
         self.allow_write = allow_write
         self.allow_shell = allow_shell
         self.dry_run = dry_run
         self.shell_timeout_seconds = shell_timeout_seconds
+        self.command_profile = normalize_command_profile(command_profile)
+        self.auto_approve_shell = auto_approve_shell
 
     def execute(self, tool: str, args: dict[str, Any]) -> ToolResult:
         """Dispatch a parsed model action to a concrete tool."""
@@ -221,11 +214,7 @@ class WorkspaceTools:
         return ToolResult(True, f"Wrote {len(content)} bytes to {path}")
 
     def apply_patch(self, *, patch: str, check_only: bool = False) -> ToolResult:
-        """Apply a unified diff through `git apply`.
-
-        Using Git here is intentional: it handles hunk offsets, mode changes and
-        path normalization better than a fragile hand-rolled patch parser.
-        """
+        """Apply a unified diff through `git apply`."""
 
         if not patch.strip():
             return ToolResult(False, "Patch is empty.")
@@ -315,10 +304,24 @@ class WorkspaceTools:
     def run_shell(self, *, command: str) -> ToolResult:
         if not self.allow_shell:
             return ToolResult(False, "Shell access is disabled. Re-run with --shell to allow commands.")
-        if _looks_dangerous(command):
-            return ToolResult(False, f"Blocked dangerous command: {command}")
+
+        decision = evaluate_command(command, profile=self.command_profile)
+        if decision.blocked:
+            return ToolResult(False, f"Blocked by command profile '{decision.profile}': {decision.reason}")
+        if decision.requires_approval and not self.auto_approve_shell:
+            return ToolResult(
+                False,
+                "Command requires approval before execution. "
+                f"Reason: {decision.reason}. "
+                "Re-run with --auto-approve-shell after reviewing the command, "
+                "or use a stricter command/profile-specific task.",
+            )
         if self.dry_run:
-            return ToolResult(True, f"Dry-run: would execute: {command}")
+            approval_note = " would require approval" if decision.requires_approval else ""
+            return ToolResult(
+                True,
+                f"Dry-run: would execute under profile '{decision.profile}'{approval_note}: {command}",
+            )
 
         completed = subprocess.run(
             command,
@@ -330,7 +333,8 @@ class WorkspaceTools:
             env=_safe_env(),
             check=False,
         )
-        output = _format_completed_process(completed)
+        output = f"policy={decision.level} profile={decision.profile} reason={decision.reason}\n"
+        output += _format_completed_process(completed)
         if len(output) > 40_000:
             output = output[:40_000] + "\n... truncated ..."
         return ToolResult(completed.returncode == 0, output)
@@ -361,10 +365,6 @@ def _is_probably_text_file(path: Path) -> bool:
     except OSError:
         return False
     return b"\x00" not in chunk
-
-
-def _looks_dangerous(command: str) -> bool:
-    return any(re.search(pattern, command) for pattern in DANGEROUS_COMMAND_PATTERNS)
 
 
 def _run_command(
