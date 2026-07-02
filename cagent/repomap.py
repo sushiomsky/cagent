@@ -12,7 +12,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 SKIP_DIRS = {
     ".git",
     ".hg",
@@ -75,11 +74,12 @@ SYMBOL_PATTERNS = [
 ]
 
 IMPORT_PATTERNS = [
-    re.compile(r"^\s*(?:from\s+\S+\s+)?import\s+(.+)$"),
+    re.compile(r"^\s*from\s+([^\s]+)\s+import\s+.+$"),
+    re.compile(r"^\s*import\s+(.+)$"),
     re.compile(r"^\s*(?:import|export)\s+.+?\s+from\s+['\"]([^'\"]+)['\"]"),
     re.compile(r"^\s*const\s+.+?=\s+require\(['\"]([^'\"]+)['\"]\)"),
     re.compile(r"^\s*use\s+([^;]+);"),
-    re.compile(r"^\s*require_once\s+[""']([^""']+)[""']"),
+    re.compile(r"^\s*require_once\s+['\"]([^'\"]+)['\"]"),
 ]
 
 
@@ -124,8 +124,7 @@ def build_repo_map(
             relative = str(file_path.relative_to(workspace.resolve()))
         except ValueError:
             continue
-        file_info = _inspect_file(file_path, relative=relative, query_terms=query_terms)
-        files.append(file_info)
+        files.append(_inspect_file(file_path, relative=relative, query_terms=query_terms))
 
     files.sort(key=lambda item: (-item.score, item.path))
     return files[:max_files]
@@ -136,7 +135,6 @@ def format_repo_map(files: list[RepoFile]) -> str:
 
     if not files:
         return "No files found."
-
     lines: list[str] = []
     for item in files:
         lines.append(
@@ -170,7 +168,6 @@ def build_context_pack(
             body = file_path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             body = f"<could not read: {exc}>\n"
-
         remaining = max_chars - used - len(header)
         if remaining <= 0:
             truncated = True
@@ -190,16 +187,17 @@ def build_context_pack(
 def format_context_pack(pack: ContextPack) -> str:
     """Render a context pack as text for the model."""
 
-    header = [
-        f"query: {pack.query}",
-        f"files: {len(pack.files)}",
-        f"truncated: {str(pack.truncated).lower()}",
-        "",
-        format_repo_map(pack.files),
-        "",
-        pack.content,
-    ]
-    return "\n".join(header).rstrip()
+    return "\n".join(
+        [
+            f"query: {pack.query}",
+            f"files: {len(pack.files)}",
+            f"truncated: {str(pack.truncated).lower()}",
+            "",
+            format_repo_map(pack.files),
+            "",
+            pack.content,
+        ]
+    ).rstrip()
 
 
 def _inspect_file(file_path: Path, *, relative: str, query_terms: set[str]) -> RepoFile:
@@ -238,14 +236,19 @@ def _extract_imports(lines: list[str], *, limit: int = 30) -> list[str]:
     for line in lines[:300]:
         for pattern in IMPORT_PATTERNS:
             match = pattern.search(line)
-            if match:
-                value = match.group(1).strip()
+            if not match:
+                continue
+            for value in _split_import_value(match.group(1)):
                 if value and value not in found:
                     found.append(value)
-                break
+            break
         if len(found) >= limit:
             break
-    return found
+    return found[:limit]
+
+
+def _split_import_value(value: str) -> list[str]:
+    return [part.strip().split()[0] for part in value.split(",") if part.strip()]
 
 
 def _score_file(
@@ -258,7 +261,6 @@ def _score_file(
 ) -> int:
     if not query_terms:
         return 0
-
     haystacks = {
         "path": relative.lower(),
         "symbols": " ".join(symbols).lower(),
@@ -284,7 +286,6 @@ def _query_terms(query: str) -> set[str]:
 def _iter_candidate_files(root: Path) -> list[Path]:
     if root.is_file():
         return [root] if _is_candidate(root) else []
-
     files: list[Path] = []
     for current_root, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(name for name in dirnames if name not in SKIP_DIRS)

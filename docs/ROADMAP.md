@@ -181,7 +181,7 @@ Status: implemented in `phase20/approval-runner-foundation` and merged.
 
 ## Phase 21: Web approval plans
 
-Status: implemented in `phase21/web-approval-plans`.
+Status: implemented in `phase21/web-approval-plans` and merged.
 
 - Show approved handling plans in `cagent serve-web`.
 - Include approval plans in `/api/status`.
@@ -189,7 +189,16 @@ Status: implemented in `phase21/web-approval-plans`.
 - Keep plan review status-only.
 - Add docs and tests.
 
-## Phase 22: Future improvements
+## Phase 22: Quality gates
+
+Status: implemented in `phase22/quality-gates`.
+
+- Add `ruff` to development dependencies.
+- Add root `Makefile` targets for compile, lint, test and full check.
+- Run the same full quality gate in GitHub Actions CI.
+- Add quality-gate documentation.
+
+## Phase 23: Future improvements
 
 - Full SDK-backed MCP server mode.
 - Optional language-specific repo map parsers.
