@@ -285,7 +285,7 @@ The model can request these tools through the JSON action loop:
 
 ## Context strategy
 
-For non-trivial repos the agent should start with `repo_map` or `context_pack` instead of reading many files blindly. The first implementation intentionally uses dependency-free regex heuristics rather than AST parsers or Tree-sitter. It detects common symbols and imports across Python, JavaScript/TypeScript, Go, Rust, PHP, shell and config/documentation files.
+For non-trivial repos the agent should start with `repo_map` or `context_pack` instead of reading many files blindly. Python files use the standard-library `ast` parser to detect imports, classes, functions, methods and symbol line ranges. Other languages continue to use lightweight dependency-free regex heuristics for common symbols and imports.
 
 ## Safety model
 
@@ -319,3 +319,4 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] local secret scanning, redaction and workspace trust
 - [x] approval queue, web review and status-only handling plans
 - [x] quality gates for compile, lint and tests
+- [x] Python AST repo map for symbol line ranges
