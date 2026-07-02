@@ -162,7 +162,7 @@ Status: implemented in `phase18/approval-integration` and merged.
 
 ## Phase 19: Web approval review
 
-Status: implemented in `phase19/web-approval-review`.
+Status: implemented in `phase19/web-approval-review` and merged.
 
 - Show approval requests in `cagent serve-web`.
 - Include approvals in `/api/status`.
@@ -170,8 +170,17 @@ Status: implemented in `phase19/web-approval-review`.
 - Keep review state changes separate from execution.
 - Add docs and tests.
 
-## Phase 20: Future improvements
+## Phase 20: Approval runner foundation
+
+Status: implemented in `phase20/approval-runner-foundation`.
+
+- Add non-executing run plans for approved requests.
+- Add `handled` approval status.
+- Add `cagent approval plan` and `cagent approval handled`.
+- Add docs and tests.
+
+## Phase 21: Future improvements
 
 - Full SDK-backed MCP server mode.
 - Optional language-specific repo map parsers.
-- Add reviewed runner for approved queue items.
+- Add specialized reviewed runners for narrow approved action types.

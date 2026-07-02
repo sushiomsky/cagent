@@ -14,7 +14,7 @@ Every state change appends a new event-like row. The latest row for an approval 
 
 ## Automatic requests from agent tools
 
-When `WorkspaceTools.run_shell` receives a policy decision that requires approval and `--auto-approve-shell` is not set, it now creates a pending approval request instead of only returning an error.
+When `WorkspaceTools.run_shell` receives a policy decision that requires approval and `--auto-approve-shell` is not set, it creates a pending approval request instead of only returning an error.
 
 The request stores:
 
@@ -62,6 +62,7 @@ cagent approval request \
 ```bash
 cagent approval list --workspace .
 cagent approval list --workspace . --status all
+cagent approval list --workspace . --status handled
 cagent approval list --workspace . --json
 ```
 
@@ -71,6 +72,7 @@ Status values:
 pending
 approved
 rejected
+handled
 all
 ```
 
@@ -81,6 +83,39 @@ cagent approval approve --workspace . <approval-id> --note "Looks safe."
 cagent approval reject --workspace . <approval-id> --note "Too broad."
 ```
 
+## Plan approved requests
+
+`approval plan` shows approved requests that are ready for manual handling. It does not execute anything.
+
+```bash
+cagent approval plan --workspace .
+cagent approval plan --workspace . --id <approval-id>
+cagent approval plan --workspace . --json
+```
+
+The plan includes:
+
+```text
+id
+action type
+title
+reason
+detail
+payload
+runnable=false
+next step
+```
+
+## Mark handled
+
+After an approved item has been handled outside cagent or by a future specialized runner, mark it as handled:
+
+```bash
+cagent approval handled --workspace . <approval-id> --note "Handled after review."
+```
+
+Only approved requests can be marked handled.
+
 ## Design notes
 
-This phase connects the durable local queue to the toolflow for approval-required command policy decisions. A later phase can execute approved requests through a separate reviewed runner and expose the queue in the web UI.
+This phase connects the durable local queue to the toolflow and adds a non-executing runner foundation. A later phase can add specialized reviewed runners for narrow action types while keeping arbitrary execution out of the default path.

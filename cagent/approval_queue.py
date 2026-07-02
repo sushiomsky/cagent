@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
-ApprovalStatus = Literal["pending", "approved", "rejected"]
+ApprovalStatus = Literal["pending", "approved", "rejected", "handled"]
+ApprovalStatusFilter = ApprovalStatus | Literal["all"]
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ def create_approval_request(
     return request
 
 
-def list_approval_requests(workspace: Path, *, status: ApprovalStatus | Literal["all"] = "pending") -> list[ApprovalRequest]:
+def list_approval_requests(workspace: Path, *, status: ApprovalStatusFilter = "pending") -> list[ApprovalRequest]:
     requests = _read_all(workspace)
     latest: dict[str, ApprovalRequest] = {}
     for request in requests:
