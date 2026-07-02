@@ -97,10 +97,17 @@ Status: implemented in `phase7-15/project-engine`.
 - Add `cagent verify` to check required project files and task state.
 - Add `cagent final-report` to generate `FINAL_REPORT.md`.
 
-## Phase 12: Future improvements
+## Phase 12: Observability and adapter foundation
+
+Status: implemented in `phase7-15/project-engine`.
+
+- Add `cagent logs` to list, inspect and HTML-render `.cagent-runs` logs.
+- Add `cagent mcp-manifest` as a stable JSON capability manifest for future MCP/server adapters.
+
+## Phase 13: Future improvements
 
 - Real MCP adapter/server mode.
-- Web UI for run logs, tasks and approvals.
+- Web UI for project tasks, approvals and run logs.
 - Secret detection before context is sent to the model.
 - Workspace trust model for first-run safety.
 - Optional language-specific repo map parsers.
