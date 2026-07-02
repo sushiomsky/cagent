@@ -35,6 +35,7 @@ from cagent.project_engine import (
     verify_project,
     write_final_report,
 )
+from cagent.project_snapshot import format_snapshot, load_snapshot, save_snapshot
 from cagent.secret_scan import format_findings, scan_workspace
 from cagent.stdio_server import serve_stdio
 from cagent.trust import format_trust_status, trust_workspace
@@ -55,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_resume(args)
         if args.command == "loop":
             return run_project_loop(args)
+        if args.command == "snapshot":
+            return run_snapshot(args)
         if args.command == "task":
             return run_task(args)
         if args.command == "tool":
@@ -138,6 +141,9 @@ def build_parser() -> argparse.ArgumentParser:
     loop.add_argument("--shell", action="store_true")
     loop.add_argument("--log-run", action="store_true", default=None)
     loop.add_argument("--show-tool-output", action="store_true")
+
+    snapshot = subparsers.add_parser("snapshot", help="Show the latest project snapshot.")
+    snapshot.add_argument("--workspace", default=".")
 
     task = subparsers.add_parser("task", help="Update project task state.")
     task.add_argument("--workspace", default=".")
@@ -382,6 +388,13 @@ def run_project_loop(args: argparse.Namespace) -> int:
         log_run=args.log_run,
     )
     result = CodingAgent(config).run(goal)
+    save_snapshot(
+        workspace,
+        action=action,
+        result=result.final_message,
+        steps=len(result.steps),
+        log_path=str(result.log_path) if result.log_path else "",
+    )
     for step in result.steps:
         print(f"[{step.index}] {step.tool}: {'ok' if step.ok else 'error'}")
         if args.show_tool_output:
@@ -389,6 +402,11 @@ def run_project_loop(args: argparse.Namespace) -> int:
             print("-" * 80)
     print(result.final_message)
     print(next_action(workspace))
+    return 0
+
+
+def run_snapshot(args: argparse.Namespace) -> int:
+    print(format_snapshot(load_snapshot(Path(args.workspace).resolve())))
     return 0
 
 
