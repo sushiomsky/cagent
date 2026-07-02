@@ -16,9 +16,9 @@ pip install -e '.[dev]'
 make check
 ```
 
-This runs bytecode compilation, a focused Ruff lint gate and the test suite.
+This runs bytecode compilation, a conservative Ruff lint target and the test suite.
 
-The default lint target focuses on critical findings so CI can be introduced without forcing a full style cleanup in the same PR.
+The required lint target is intentionally narrow so the project can gain a stable CI gate before a wider cleanup pass.
 
 ## Individual checks
 
@@ -38,4 +38,4 @@ This runs the default Ruff ruleset and is intended for future cleanup PRs.
 
 ## Why this matters
 
-The project is intentionally lightweight and dependency-minimal. The quality gate keeps that simplicity while catching critical lint issues and test regressions before the agent workflow continues.
+The project is intentionally lightweight and dependency-minimal. The quality gate keeps that simplicity while catching check regressions before the agent workflow continues.
