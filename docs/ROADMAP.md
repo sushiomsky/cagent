@@ -116,16 +116,25 @@ Status: implemented in `phase13/security-foundation` and merged.
 
 ## Phase 14: Stdio adapter
 
-Status: implemented in `phase14/stdio-adapter`.
+Status: implemented in `phase14/stdio-adapter` and merged.
 
 - Add `cagent serve-stdio`.
 - Add a line-delimited JSON-RPC adapter with `initialize`, `tools/list`, `tools/call` and `shutdown`.
 - Expose conservative project-state tools for resume, verify, secret scan, trust, final report and manifest.
 - Add adapter docs and tests.
 
-## Phase 15: Future improvements
+## Phase 15: Local web UI
+
+Status: implemented in `phase15/web-ui`.
+
+- Add `cagent serve-web`.
+- Add a dependency-free local dashboard for project, tasks, verification, security, trust and run logs.
+- Add JSON status endpoint and light actions for workspace trust and final report generation.
+- Add web UI docs and tests.
+
+## Phase 16: Future improvements
 
 - Full SDK-backed MCP server mode.
-- Web UI for project tasks, approvals and run logs.
 - Stronger secret scanning with allowlists and entropy checks.
 - Optional language-specific repo map parsers.
+- Rich approval queues for project/task actions.
