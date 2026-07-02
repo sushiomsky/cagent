@@ -65,6 +65,7 @@ class CodingAgent:
                 workspace=self.config.workspace,
                 goal=goal,
                 model=self.config.model,
+                model_role=self.config.model_role,
                 base_url=self.config.base_url,
             )
             if self.config.log_run
