@@ -8,11 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from cagent.action_schema import build_action_repair_prompt, validate_action
 from cagent.config import AgentConfig
 from cagent.llm import ChatMessage, OpenAICompatibleClient
 from cagent.prompts import SYSTEM_PROMPT, build_goal_prompt
 from cagent.runlog import RunLogger
 from cagent.tools import WorkspaceTools
+
+MAX_ACTION_REPAIR_ATTEMPTS = 2
 
 
 @dataclass(frozen=True)
@@ -89,13 +92,15 @@ class CodingAgent:
             if logger:
                 logger.record("model_response", {"step": index, "raw_response": raw_response})
 
-            action = parse_action(raw_response)
+            action = self._parse_validate_or_repair(
+                raw_response=raw_response,
+                messages=messages,
+                logger=logger,
+                step=index,
+            )
             tool = str(action.get("tool", "")).strip()
             args = action.get("args") or {}
             note = str(action.get("note", "")).strip()
-
-            if not isinstance(args, dict):
-                raise AgentProtocolError(f"Action args must be an object: {action!r}")
 
             if tool == "finish":
                 message = str(args.get("message", "Done."))
@@ -138,6 +143,46 @@ class CodingAgent:
             log_path=logger.path if logger else None,
         )
 
+    def _parse_validate_or_repair(
+        self,
+        *,
+        raw_response: str,
+        messages: list[ChatMessage],
+        logger: RunLogger | None,
+        step: int,
+    ) -> dict[str, Any]:
+        """Parse and validate an action, asking the model to repair bad output."""
+
+        current = raw_response
+        for attempt in range(MAX_ACTION_REPAIR_ATTEMPTS + 1):
+            try:
+                action = parse_action(current)
+                errors = validate_action(action)
+                if errors:
+                    raise AgentProtocolError("; ".join(errors))
+                return action
+            except AgentProtocolError as exc:
+                if attempt >= MAX_ACTION_REPAIR_ATTEMPTS:
+                    raise
+                repair_prompt = build_action_repair_prompt(error=str(exc), raw_response=current)
+                if logger:
+                    logger.record(
+                        "action_repair",
+                        {"step": step, "attempt": attempt + 1, "error": str(exc)},
+                    )
+                repair_messages = [*messages, ChatMessage("assistant", current), ChatMessage("user", repair_prompt)]
+                current = self.client.complete(
+                    messages=repair_messages,
+                    temperature=0.0,
+                    max_tokens=self.config.max_tokens,
+                )
+                if logger:
+                    logger.record(
+                        "model_response",
+                        {"step": step, "repair_attempt": attempt + 1, "raw_response": current},
+                    )
+        raise AgentProtocolError("could not repair model action")
+
 
 def parse_action(raw_response: str) -> dict[str, Any]:
     """Parse the model response as JSON, with a fallback for fenced JSON blocks."""
@@ -146,7 +191,10 @@ def parse_action(raw_response: str) -> dict[str, Any]:
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
-        parsed = json.loads(_extract_json_object(text))
+        try:
+            parsed = json.loads(_extract_json_object(text))
+        except json.JSONDecodeError as exc:
+            raise AgentProtocolError(f"Could not parse JSON action: {exc}") from exc
 
     if not isinstance(parsed, dict):
         raise AgentProtocolError(f"Model response must be a JSON object: {raw_response}")
