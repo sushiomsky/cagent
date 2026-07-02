@@ -23,7 +23,7 @@ Status: implemented in `phase2/patch-diff-logs` and merged.
 
 ## Phase 3: Context packing
 
-Status: implemented in `phase3/repo-map-context`.
+Status: implemented in `phase3/repo-map-context` and merged.
 
 - Build a repo map from filenames, imports and symbols.
 - Add char-budgeted context packs.
@@ -32,9 +32,13 @@ Status: implemented in `phase3/repo-map-context`.
 
 ## Phase 4: Model router
 
-- Default model: fast coding model, for example `qwen2.5-coder:14b-instruct-q4_K_M`.
-- Reviewer model: larger/slower model for planning and final code review.
-- Optional cloud fallback via OpenAI-compatible config only; no hard dependency.
+Status: implemented in `phase4/model-router`.
+
+- Add default, fast and reviewer model profiles.
+- Add CLI flags and environment variables for model roles.
+- Make `doctor` show selected role, selected model and all configured profiles.
+- Include model role in run logs.
+- Add tests and documentation for role resolution.
 
 ## Phase 5: Approval and safety
 
