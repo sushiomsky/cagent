@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Small self-hosted coding agent for OpenAI-compatible local model endpoints."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 authors = [{ name = "sushiomsky" }]
 dependencies = []
 
