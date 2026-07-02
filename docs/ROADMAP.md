@@ -13,7 +13,7 @@ Status: implemented in `bootstrap/mvp-agent` and merged.
 
 ## Phase 2: Better code editing
 
-Status: implemented in `phase2/patch-diff-logs`.
+Status: implemented in `phase2/patch-diff-logs` and merged.
 
 - Add an `apply_patch` tool instead of rewriting full files for every edit.
 - Add a structured `git_diff` tool.
@@ -23,10 +23,12 @@ Status: implemented in `phase2/patch-diff-logs`.
 
 ## Phase 3: Context packing
 
-- Build a repo map from filenames, imports, symbols and recent diffs.
-- Add token-budgeted context packs.
-- Add ignore rules for generated files, vendored files and large assets.
-- Add a short persistent task memory per workspace.
+Status: implemented in `phase3/repo-map-context`.
+
+- Build a repo map from filenames, imports and symbols.
+- Add char-budgeted context packs.
+- Add ignore rules for generated files, vendored files, run logs and large binary assets.
+- Add tests and documentation for context selection.
 
 ## Phase 4: Model router
 

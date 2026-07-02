@@ -21,6 +21,7 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - no mandatory cloud dependency
 - workspace-scoped file access
 - guarded shell execution with timeout
+- repo map and context pack tools
 - patch-based edits via `git apply`
 - git status/diff review tool
 - optional local JSONL run logs
@@ -111,6 +112,8 @@ cagent run \
 The model can request these tools through the JSON action loop:
 
 - `list_files`: list workspace files
+- `repo_map`: ranked repository overview with language, line counts, symbols and imports
+- `context_pack`: compact relevant file snippets selected from the repo map
 - `read_file`: read a UTF-8 file with optional line range
 - `write_file`: write or replace a UTF-8 file
 - `apply_patch`: apply a unified diff through `git apply`
@@ -119,6 +122,10 @@ The model can request these tools through the JSON action loop:
 - `discover_tests`: suggest likely test commands
 - `run_shell`: run guarded shell commands when `--shell` is enabled
 - `finish`: end the run
+
+## Context strategy
+
+For non-trivial repos the agent should start with `repo_map` or `context_pack` instead of reading many files blindly. The first implementation intentionally uses dependency-free regex heuristics rather than AST parsers or Tree-sitter. It detects common symbols and imports across Python, JavaScript/TypeScript, Go, Rust, PHP, shell and config/documentation files.
 
 ## Safety model
 
@@ -140,7 +147,7 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] git diff review tool
 - [x] optional run logs
 - [x] test command discovery
+- [x] repo map and context packer
 - [ ] model router: fast/default/reviewer
 - [ ] approval prompts for risky actions
-- [ ] repo map and context packer
 - [ ] OpenWebUI/Codex integration docs

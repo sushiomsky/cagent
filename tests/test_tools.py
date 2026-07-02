@@ -34,6 +34,28 @@ def test_rejects_workspace_escape(tmp_path):
     assert "escapes workspace" in result.output
 
 
+def test_repo_map_tool_returns_symbols(tmp_path):
+    tools = make_tools(tmp_path)
+    (tmp_path / "agent.py").write_text("class CodingAgent:\n    pass\n", encoding="utf-8")
+
+    result = tools.repo_map(query="CodingAgent")
+
+    assert result.ok
+    assert "agent.py" in result.output
+    assert "CodingAgent" in result.output
+
+
+def test_context_pack_tool_returns_file_content(tmp_path):
+    tools = make_tools(tmp_path)
+    (tmp_path / "agent.py").write_text("class CodingAgent:\n    pass\n", encoding="utf-8")
+
+    result = tools.context_pack(query="CodingAgent", max_files=1, max_chars=1000)
+
+    assert result.ok
+    assert "--- FILE: agent.py" in result.output
+    assert "class CodingAgent" in result.output
+
+
 def test_apply_patch_changes_existing_file(tmp_path):
     tools = make_tools(tmp_path, write=True)
     (tmp_path / "a.txt").write_text("alpha\nbeta\n", encoding="utf-8")

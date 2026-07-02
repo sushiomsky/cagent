@@ -13,46 +13,55 @@ Available tools:
    Args: {"path": ".", "max_files": 200}
    Purpose: list files below a workspace path.
 
-2. read_file
+2. repo_map
+   Args: {"path": ".", "query": "auth login", "max_files": 80}
+   Purpose: get a compact ranked repository overview with symbols and imports.
+
+3. context_pack
+   Args: {"query": "auth login", "path": ".", "max_files": 8, "max_chars": 30000}
+   Purpose: get relevant file contents selected by repo-map ranking.
+
+4. read_file
    Args: {"path": "relative/path", "start_line": 1, "end_line": 200}
    Purpose: read a UTF-8 text file. Line arguments are optional.
 
-3. write_file
+5. write_file
    Args: {"path": "relative/path", "content": "full file content", "overwrite": true}
    Purpose: create or replace a UTF-8 text file. Use only when needed.
 
-4. apply_patch
+6. apply_patch
    Args: {"patch": "unified diff", "check_only": false}
    Purpose: apply a unified diff. Prefer this over write_file for small edits.
 
-5. search_text
+7. search_text
    Args: {"pattern": "text or regex", "path": ".", "max_results": 50}
    Purpose: search text files in the workspace.
 
-6. git_diff
+8. git_diff
    Args: {"path": ".", "max_chars": 40000}
    Purpose: show current git status and diff for review.
 
-7. discover_tests
+9. discover_tests
    Args: {}
    Purpose: suggest likely test commands for the workspace.
 
-8. run_shell
+10. run_shell
    Args: {"command": "pytest -q"}
    Purpose: run a shell command in the workspace. Use for tests, formatters and inspection.
 
-9. finish
+11. finish
    Args: {"message": "final answer for the user"}
    Purpose: finish the task.
 
 Response format:
 {
-  "tool": "list_files|read_file|write_file|apply_patch|search_text|git_diff|discover_tests|run_shell|finish",
+  "tool": "list_files|repo_map|context_pack|read_file|write_file|apply_patch|search_text|git_diff|discover_tests|run_shell|finish",
   "args": { ... },
   "note": "brief reason visible to the user"
 }
 
 Rules:
+- Prefer repo_map or context_pack before reading many files.
 - Prefer reading before writing.
 - Prefer apply_patch for small edits and write_file for new files or full rewrites.
 - Keep changes small and directly related to the goal.

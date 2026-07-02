@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from cagent.repomap import build_context_pack, build_repo_map, format_context_pack, format_repo_map
+
 
 SKIPPED_DIRS = {
     ".git",
@@ -78,6 +80,19 @@ class WorkspaceTools:
                     path=str(args.get("path", ".")),
                     max_files=int(args.get("max_files", 200)),
                 )
+            if tool == "repo_map":
+                return self.repo_map(
+                    path=str(args.get("path", ".")),
+                    query=str(args.get("query", "")),
+                    max_files=int(args.get("max_files", 80)),
+                )
+            if tool == "context_pack":
+                return self.context_pack(
+                    query=str(args.get("query", "")),
+                    path=str(args.get("path", ".")),
+                    max_files=int(args.get("max_files", 8)),
+                    max_chars=int(args.get("max_chars", 30_000)),
+                )
             if tool == "read_file":
                 return self.read_file(
                     path=str(args["path"]),
@@ -143,6 +158,27 @@ class WorkspaceTools:
                     return ToolResult(True, "\n".join(files) + "\n... truncated ...")
 
         return ToolResult(True, "\n".join(files) if files else "No files found.")
+
+    def repo_map(self, *, path: str = ".", query: str = "", max_files: int = 80) -> ToolResult:
+        files = build_repo_map(self.workspace, path=path, query=query, max_files=max_files)
+        return ToolResult(True, format_repo_map(files))
+
+    def context_pack(
+        self,
+        *,
+        query: str,
+        path: str = ".",
+        max_files: int = 8,
+        max_chars: int = 30_000,
+    ) -> ToolResult:
+        pack = build_context_pack(
+            self.workspace,
+            query=query,
+            path=path,
+            max_files=max_files,
+            max_chars=max_chars,
+        )
+        return ToolResult(True, format_context_pack(pack))
 
     def read_file(
         self,
