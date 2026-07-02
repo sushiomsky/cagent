@@ -23,6 +23,15 @@ JSONRPC_VERSION = "2.0"
 SERVER_NAME = "cagent-stdio"
 SERVER_VERSION = "0.1"
 
+RESOURCE_FILES: dict[str, str] = {
+    "cagent://project/spec": "PROJECT_SPEC.md",
+    "cagent://project/tasks": "TASKS.md",
+    "cagent://project/workflow": "WORKFLOW.md",
+    "cagent://project/agents": "AGENTS.md",
+    "cagent://project/final-report": "FINAL_REPORT.md",
+    "cagent://project/snapshot": ".cagent/snapshot.json",
+}
+
 
 @dataclass(frozen=True)
 class ToolDefinition:
@@ -151,6 +160,10 @@ def handle_request(request: Any) -> dict[str, Any] | None:
             result = {"tools": [tool_to_dict(tool) for tool in TOOLS]}
         elif method == "tools/call":
             result = call_tool(params)
+        elif method == "resources/list":
+            result = {"resources": list_resources(params)}
+        elif method == "resources/read":
+            result = read_resource(params)
         elif method == "shutdown":
             result = {"shutdown": True}
         else:
@@ -166,8 +179,8 @@ def handle_request(request: Any) -> dict[str, Any] | None:
 def initialize_result() -> dict[str, Any]:
     return {
         "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-        "capabilities": {"tools": {"listChanged": False}},
-        "instructions": "Use tools/list and tools/call. This adapter exposes conservative cagent project-state tools.",
+        "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False}},
+        "instructions": "Use tools/list, tools/call, resources/list and resources/read for conservative cagent project-state access.",
     }
 
 
@@ -202,6 +215,36 @@ def call_tool(params: dict[str, Any]) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": text}], "isError": False}
 
 
+def list_resources(params: dict[str, Any]) -> list[dict[str, Any]]:
+    workspace = _workspace(params)
+    resources: list[dict[str, Any]] = []
+    for uri, relative in RESOURCE_FILES.items():
+        path = workspace / relative
+        resources.append(
+            {
+                "uri": uri,
+                "name": Path(relative).name,
+                "mimeType": "application/json" if path.suffix == ".json" else "text/markdown",
+                "exists": path.exists(),
+            }
+        )
+    return resources
+
+
+def read_resource(params: dict[str, Any]) -> dict[str, Any]:
+    uri = params.get("uri")
+    if not isinstance(uri, str) or uri not in RESOURCE_FILES:
+        raise RpcError(-32602, "resources/read requires a known uri")
+    workspace = _workspace(params)
+    path = (workspace / RESOURCE_FILES[uri]).resolve()
+    if workspace not in path.parents and path != workspace:
+        raise RpcError(-32602, "resource path escapes workspace")
+    if not path.exists():
+        raise RpcError(-32004, f"resource not found: {uri}")
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return {"contents": [{"uri": uri, "mimeType": _mime_type(path), "text": text}]}
+
+
 def tool_to_dict(tool: ToolDefinition) -> dict[str, Any]:
     return {
         "name": tool.name,
@@ -228,3 +271,7 @@ def _format_verification(workspace: Path) -> str:
     lines.extend(f"warn: {item}" for item in result.warnings)
     lines.extend(f"missing: {item}" for item in result.missing)
     return "\n".join(lines)
+
+
+def _mime_type(path: Path) -> str:
+    return "application/json" if path.suffix == ".json" else "text/markdown"
