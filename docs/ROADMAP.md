@@ -191,15 +191,26 @@ Status: implemented in `phase21/web-approval-plans` and merged.
 
 ## Phase 22: Quality gates
 
-Status: implemented in `phase22/quality-gates`.
+Status: implemented in `phase22/quality-gates` and merged.
 
 - Add `ruff` to development dependencies.
 - Add root `Makefile` targets for compile, lint, test and full check.
-- Run the same full quality gate in GitHub Actions CI.
+- Run compile, lint and tests in GitHub Actions CI.
 - Add quality-gate documentation.
+- Fix bugs surfaced by the new quality gate.
 
-## Phase 23: Future improvements
+## Phase 23: Python AST repo map
+
+Status: implemented in `phase23/python-ast-repomap`.
+
+- Use Python's standard-library `ast` parser for `.py` files.
+- Add symbol line ranges for classes, functions and methods.
+- Improve Python import extraction for `import` and `from ... import ...`.
+- Include symbol line-range hints in repo map and context-pack output.
+- Add tests for AST symbols, methods, imports and context-pack metadata.
+
+## Phase 24: Future improvements
 
 - Full SDK-backed MCP server mode.
-- Optional language-specific repo map parsers.
+- Agent action schema validation and repair loop.
 - Add more narrow reviewed status workflows.
