@@ -2,7 +2,7 @@
 
 `cagent approval` manages a local JSONL approval queue in one workspace.
 
-The queue is meant for risky or irreversible actions that should be reviewed before execution, such as shell commands, file writes, network access, dependency installs or deploy steps.
+The queue is meant for risky or irreversible actions that should be reviewed before execution, such as local command execution, file writes, network access, dependency installs or deploy steps.
 
 ## Storage
 
@@ -12,15 +12,38 @@ The queue is meant for risky or irreversible actions that should be reviewed bef
 
 Every state change appends a new event-like row. The latest row for an approval ID is the current state.
 
-## Create a request
+## Automatic requests from agent tools
+
+When `WorkspaceTools.run_shell` receives a policy decision that requires approval and `--auto-approve-shell` is not set, it now creates a pending approval request instead of only returning an error.
+
+The request stores:
+
+```text
+id
+status
+action_type
+reason
+command
+policy profile
+policy level
+tool name
+```
+
+The agent can continue with a clear status message, and the user can review the pending item with:
+
+```bash
+cagent approval list --workspace .
+```
+
+## Create a manual request
 
 ```bash
 cagent approval request \
   --workspace . \
   --type shell \
-  --title "Run tests" \
-  --reason "Needed to verify the implementation" \
-  --command "pytest -q"
+  --title "Review action" \
+  --reason "Needed for the current task" \
+  --command "review-me"
 ```
 
 Optional payload:
@@ -29,7 +52,7 @@ Optional payload:
 cagent approval request \
   --workspace . \
   --type network \
-  --title "Fetch dependency docs" \
+  --title "Review external lookup" \
   --reason "Research current tool behavior" \
   --payload '{"url":"https://example.test/docs"}'
 ```
@@ -60,4 +83,4 @@ cagent approval reject --workspace . <approval-id> --note "Too broad."
 
 ## Design notes
 
-This phase adds the durable local queue and CLI. A later phase can make the agent automatically create queue entries when the command policy returns `approval`, and the web UI can expose the queue as an interactive review surface.
+This phase connects the durable local queue to the toolflow for approval-required command policy decisions. A later phase can execute approved requests through a separate reviewed runner and expose the queue in the web UI.
