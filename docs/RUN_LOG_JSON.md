@@ -15,4 +15,14 @@ print(events_json(path, max_events=50))
 
 `events_json()` returns the most recent events from a selected JSONL run log.
 
-These helpers are intentionally in the core module first so CLI, web UI and adapter layers can share the same serialization behavior later.
+## CLI
+
+Install the package, then run:
+
+```bash
+cagent-logs-json --workspace .
+cagent-logs-json --workspace . --latest
+cagent-logs-json --workspace . --show run.jsonl --max-events 20
+```
+
+This prints JSON to stdout. The standalone command is intentionally small and can be reused by other CLI, web UI or adapter layers later.
