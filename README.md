@@ -25,6 +25,8 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - repo map and context pack tools
 - project wizard/bootstrapper with `.cagent` state
 - task board, tool registry, research notes, artifacts and final reports
+- local run-log viewer and HTML export
+- MCP-style capability manifest export
 - patch-based edits via `git apply`
 - git status/diff review tool
 - optional local JSONL run logs
@@ -136,6 +138,20 @@ export CAGENT_LOG_RUNS=1
 ```
 
 Logs are written to `.cagent-runs/*.jsonl` and may contain model responses, tool arguments and tool output.
+
+Inspect logs:
+
+```bash
+cagent logs --workspace .
+cagent logs --workspace . --latest
+cagent logs --workspace . --latest --html run.html
+```
+
+Export a capability manifest for future MCP/server adapters:
+
+```bash
+cagent mcp-manifest
+```
 
 ## Project wizard and workflow engine
 
@@ -257,3 +273,4 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] project wizard/bootstrapper
 - [x] persistent task state and resume loop
 - [x] tool registry, research notes, verification and final report
+- [x] run-log viewer and MCP-style manifest export
