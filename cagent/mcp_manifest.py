@@ -39,6 +39,11 @@ def build_manifest() -> dict[str, Any]:
                 "description": "Read .cagent state and show the next project action.",
             },
             {
+                "name": "snapshot",
+                "kind": "state",
+                "description": "Read the compact .cagent project snapshot.",
+            },
+            {
                 "name": "research",
                 "kind": "research_notes",
                 "description": "Create structured source notes in docs/research/.",
