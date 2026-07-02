@@ -73,6 +73,11 @@ def build_manifest() -> dict[str, Any]:
                 "kind": "workspace_trust",
                 "description": "Create or inspect local workspace trust metadata.",
             },
+            {
+                "name": "serve-stdio",
+                "kind": "stdio_adapter",
+                "description": "Run a line-delimited JSON-RPC stdio adapter exposing conservative cagent tools.",
+            },
         ],
     }
 

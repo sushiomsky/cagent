@@ -27,6 +27,7 @@ from cagent.project_engine import (
     write_final_report,
 )
 from cagent.secret_scan import format_findings, scan_workspace
+from cagent.stdio_server import serve_stdio
 from cagent.trust import format_trust_status, trust_workspace
 
 
@@ -61,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_secret_scan(args)
         if args.command == "trust":
             return run_trust(args)
+        if args.command == "serve-stdio":
+            return serve_stdio()
         if args.command == "mcp-manifest":
             return run_mcp_manifest()
     except (LLMError, AgentProtocolError, ValueError, OSError) as exc:
@@ -171,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     trust.add_argument("--status", action="store_true", help="Only print trust status.")
     trust.add_argument("--reason", default="User explicitly trusted this workspace.")
 
+    subparsers.add_parser("serve-stdio", help="Run the local line-delimited JSON-RPC stdio adapter.")
     subparsers.add_parser("mcp-manifest", help="Print a JSON manifest of cagent capabilities.")
 
     return parser

@@ -106,7 +106,7 @@ Status: implemented in `phase7-15/project-engine` and merged.
 
 ## Phase 13: Secret scanning and workspace trust
 
-Status: implemented in `phase13/security-foundation`.
+Status: implemented in `phase13/security-foundation` and merged.
 
 - Add local secret scanning and formatting.
 - Redact likely secrets from tool output by default.
@@ -114,9 +114,18 @@ Status: implemented in `phase13/security-foundation`.
 - Add `.cagent/trust.json` workspace trust metadata.
 - Expose security capabilities in the manifest.
 
-## Phase 14: Future improvements
+## Phase 14: Stdio adapter
 
-- Real MCP adapter/server mode.
+Status: implemented in `phase14/stdio-adapter`.
+
+- Add `cagent serve-stdio`.
+- Add a line-delimited JSON-RPC adapter with `initialize`, `tools/list`, `tools/call` and `shutdown`.
+- Expose conservative project-state tools for resume, verify, secret scan, trust, final report and manifest.
+- Add adapter docs and tests.
+
+## Phase 15: Future improvements
+
+- Full SDK-backed MCP server mode.
 - Web UI for project tasks, approvals and run logs.
 - Stronger secret scanning with allowlists and entropy checks.
 - Optional language-specific repo map parsers.
