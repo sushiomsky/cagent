@@ -51,7 +51,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--write", action="store_true", help="Allow file writes and patch application inside the workspace.")
     run.add_argument("--shell", action="store_true", help="Allow guarded shell commands inside the workspace.")
     run.add_argument("--dry-run", action="store_true", help="Show intended writes/commands without executing them.")
-    run.add_argument("--log-run", action="store_true", help="Write a JSONL run log under .cagent-runs/.")
+    run.add_argument(
+        "--log-run",
+        action="store_true",
+        default=None,
+        help="Write a JSONL run log under .cagent-runs/.",
+    )
     run.add_argument("--show-tool-output", action="store_true", help="Print full tool output after each step.")
 
     return parser
