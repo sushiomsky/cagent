@@ -27,6 +27,8 @@ class AgentConfig:
     max_tokens: int = 4096
     max_steps: int = 8
     request_timeout_seconds: int = 120
+    request_retries: int = 1
+    retry_backoff_seconds: float = 0.5
     shell_timeout_seconds: int = 30
     allow_write: bool = False
     allow_shell: bool = False
@@ -52,6 +54,8 @@ class AgentConfig:
         max_tokens: int | None = None,
         max_steps: int | None = None,
         request_timeout_seconds: int | None = None,
+        request_retries: int | None = None,
+        retry_backoff_seconds: float | None = None,
         shell_timeout_seconds: int | None = None,
         command_profile: str | None = None,
         auto_approve_shell: bool | None = None,
@@ -88,6 +92,14 @@ class AgentConfig:
                 request_timeout_seconds
                 if request_timeout_seconds is not None
                 else os.environ.get("CAGENT_REQUEST_TIMEOUT_SECONDS", "120")
+            ),
+            request_retries=int(
+                request_retries if request_retries is not None else os.environ.get("CAGENT_REQUEST_RETRIES", "1")
+            ),
+            retry_backoff_seconds=float(
+                retry_backoff_seconds
+                if retry_backoff_seconds is not None
+                else os.environ.get("CAGENT_RETRY_BACKOFF_SECONDS", "0.5")
             ),
             shell_timeout_seconds=int(
                 shell_timeout_seconds
