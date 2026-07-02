@@ -1,15 +1,17 @@
 """Repository map and context packing helpers.
 
 This module intentionally avoids heavyweight parser dependencies. It gives the
-agent a useful first-pass overview by combining filename ranking, simple import
-extraction and regex-based symbol discovery.
+agent a useful first-pass overview by combining filename ranking, import
+extraction and symbol discovery. Python files use the standard-library ``ast``
+parser for more precise symbols and line ranges.
 """
 
 from __future__ import annotations
 
+import ast
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 SKIP_DIRS = {
@@ -94,6 +96,7 @@ class RepoFile:
     symbols: list[str]
     imports: list[str]
     score: int = 0
+    symbol_ranges: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,13 @@ class ContextPack:
     files: list[RepoFile]
     content: str
     truncated: bool
+
+
+@dataclass(frozen=True)
+class PythonAstInfo:
+    symbols: list[str]
+    imports: list[str]
+    symbol_ranges: dict[str, str]
 
 
 def build_repo_map(
@@ -139,7 +149,7 @@ def format_repo_map(files: list[RepoFile]) -> str:
     for item in files:
         lines.append(
             f"{item.path} | lang={item.language} | lines={item.line_count} | "
-            f"score={item.score} | symbols={', '.join(item.symbols[:8]) or '-'}"
+            f"score={item.score} | symbols={_format_symbols(item)}"
         )
         if item.imports:
             lines.append(f"  imports: {', '.join(item.imports[:8])}")
@@ -164,6 +174,8 @@ def build_context_pack(
     for item in selected:
         file_path = workspace.resolve() / item.path
         header = f"\n--- FILE: {item.path} ({item.language}, {item.line_count} lines) ---\n"
+        if item.symbol_ranges:
+            header += f"symbols: {_format_symbols(item)}\n"
         try:
             body = file_path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
@@ -203,9 +215,18 @@ def format_context_pack(pack: ContextPack) -> str:
 def _inspect_file(file_path: Path, *, relative: str, query_terms: set[str]) -> RepoFile:
     text = file_path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
-    symbols = _extract_symbols(lines)
-    imports = _extract_imports(lines)
     language = LANGUAGE_BY_SUFFIX.get(file_path.suffix.lower(), file_path.suffix.lower().lstrip(".") or "text")
+
+    symbol_ranges: dict[str, str] = {}
+    if language == "python":
+        ast_info = _inspect_python_ast(text)
+        symbols = ast_info.symbols or _extract_symbols(lines)
+        imports = ast_info.imports or _extract_imports(lines)
+        symbol_ranges = ast_info.symbol_ranges
+    else:
+        symbols = _extract_symbols(lines)
+        imports = _extract_imports(lines)
+
     score = _score_file(relative=relative, text=text, symbols=symbols, imports=imports, query_terms=query_terms)
     return RepoFile(
         path=relative,
@@ -215,7 +236,61 @@ def _inspect_file(file_path: Path, *, relative: str, query_terms: set[str]) -> R
         symbols=symbols,
         imports=imports,
         score=score,
+        symbol_ranges=symbol_ranges,
     )
+
+
+def _inspect_python_ast(text: str) -> PythonAstInfo:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return PythonAstInfo([], [], {})
+
+    symbols: list[str] = []
+    imports: list[str] = []
+    ranges: dict[str, str] = {}
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            _add_symbol(symbols, ranges, node.name, node)
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    _add_symbol(symbols, ranges, f"{node.name}.{child.name}", child)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _add_symbol(symbols, ranges, node.name, node)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                _add_import(imports, alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            module = "." * node.level + (node.module or "")
+            _add_import(imports, module)
+
+    return PythonAstInfo(symbols, imports, ranges)
+
+
+def _add_symbol(symbols: list[str], ranges: dict[str, str], name: str, node: ast.AST) -> None:
+    if name not in symbols:
+        symbols.append(name)
+    start = getattr(node, "lineno", None)
+    end = getattr(node, "end_lineno", None) or start
+    if start:
+        ranges[name] = f"{start}-{end}"
+
+
+def _add_import(imports: list[str], value: str) -> None:
+    cleaned = value.strip()
+    if cleaned and cleaned not in imports:
+        imports.append(cleaned)
+
+
+def _format_symbols(item: RepoFile) -> str:
+    if not item.symbols:
+        return "-"
+    formatted = []
+    for symbol in item.symbols[:8]:
+        line_range = item.symbol_ranges.get(symbol)
+        formatted.append(f"{symbol}@{line_range}" if line_range else symbol)
+    return ", ".join(formatted)
 
 
 def _extract_symbols(lines: list[str], *, limit: int = 30) -> list[str]:
