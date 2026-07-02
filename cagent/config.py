@@ -6,7 +6,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from cagent.model_router import DEFAULT_DAILY_MODEL, DEFAULT_FAST_MODEL, DEFAULT_REVIEWER_MODEL, ModelProfiles, normalize_model_role
+from cagent.model_router import (
+    DEFAULT_DAILY_MODEL,
+    DEFAULT_FAST_MODEL,
+    DEFAULT_REVIEWER_MODEL,
+    ModelProfiles,
+    normalize_model_role,
+)
 
 
 @dataclass(frozen=True)
