@@ -121,7 +121,10 @@ class WorkspaceTools:
         return candidate
 
     def list_files(self, *, path: str = ".", max_files: int = 200) -> ToolResult:
-        root = self.resolve_path(path)
+        try:
+            root = self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         if not root.exists():
             return ToolResult(False, f"Path does not exist: {path}")
         files: list[str] = []
@@ -137,15 +140,26 @@ class WorkspaceTools:
         return ToolResult(True, "\n".join(files) if files else "No files found.")
 
     def repo_map(self, *, path: str = ".", query: str = "", max_files: int = 80) -> ToolResult:
+        try:
+            self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         files = build_repo_map(self.workspace, path=path, query=query, max_files=max_files)
         return ToolResult(True, format_repo_map(files))
 
     def context_pack(self, *, query: str, path: str = ".", max_files: int = 8, max_chars: int = 30_000) -> ToolResult:
+        try:
+            self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         pack = build_context_pack(self.workspace, query=query, path=path, max_files=max_files, max_chars=max_chars)
         return ToolResult(True, self._redact(format_context_pack(pack)))
 
     def read_file(self, *, path: str, start_line: int | None = None, end_line: int | None = None, max_chars: int = 30_000) -> ToolResult:
-        full_path = self.resolve_path(path)
+        try:
+            full_path = self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         if not full_path.exists():
             return ToolResult(False, f"File does not exist: {path}")
         if not full_path.is_file():
@@ -164,7 +178,10 @@ class WorkspaceTools:
     def write_file(self, *, path: str, content: str, overwrite: bool = True) -> ToolResult:
         if not self.allow_write:
             return ToolResult(False, "Write access is disabled. Re-run with --write to allow file changes.")
-        full_path = self.resolve_path(path)
+        try:
+            full_path = self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         if full_path.exists() and not overwrite:
             return ToolResult(False, f"File exists and overwrite=false: {path}")
         if self.dry_run:
@@ -188,7 +205,10 @@ class WorkspaceTools:
         return ToolResult(applied.returncode == 0, self._redact(_format_completed_process(applied)))
 
     def search_text(self, *, pattern: str, path: str = ".", max_results: int = 50) -> ToolResult:
-        root = self.resolve_path(path)
+        try:
+            root = self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         if not root.exists():
             return ToolResult(False, f"Path does not exist: {path}")
         regex = re.compile(pattern, re.IGNORECASE)
@@ -208,7 +228,10 @@ class WorkspaceTools:
         return ToolResult(True, self._redact("\n".join(results) if results else "No matches."))
 
     def git_diff(self, *, path: str = ".", max_chars: int = 40_000) -> ToolResult:
-        resolved = self.resolve_path(path)
+        try:
+            resolved = self.resolve_path(path)
+        except ValueError as exc:
+            return ToolResult(False, str(exc))
         relative = "." if resolved == self.workspace else str(resolved.relative_to(self.workspace))
         status = _run_command(["git", "status", "--short", "--untracked-files=all", "--", relative], cwd=self.workspace, timeout_seconds=self.shell_timeout_seconds, input_text=None)
         diff = _run_command(["git", "diff", "--", relative], cwd=self.workspace, timeout_seconds=self.shell_timeout_seconds, input_text=None)

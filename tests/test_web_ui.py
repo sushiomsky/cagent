@@ -2,11 +2,12 @@ import json
 from http import HTTPStatus
 from urllib.parse import urlencode
 
+from cagent.approval_queue import create_approval_request, get_approval_request
 from cagent.project_engine import create_project
 from cagent.web_ui import CagentWebHandler, render_dashboard, status_payload
 
 
-def test_status_payload_includes_project_and_security(tmp_path):
+def test_status_payload_includes_project_security_and_approvals(tmp_path):
     create_project(
         root=tmp_path,
         name="Demo UI",
@@ -16,6 +17,13 @@ def test_status_payload_includes_project_and_security(tmp_path):
         create_hooks=False,
     )
     (tmp_path / ".env").write_text("TOKEN=1234567890abcdef\n", encoding="utf-8")
+    approval = create_approval_request(
+        tmp_path,
+        action_type="shell",
+        title="Review action",
+        reason="Needs review.",
+        command="review-me",
+    )
 
     payload = status_payload(tmp_path)
 
@@ -23,9 +31,10 @@ def test_status_payload_includes_project_and_security(tmp_path):
     assert "T001" in payload["next_action"]
     assert payload["secret_findings"]
     assert "trust" in payload["trust_status"].lower()
+    assert payload["approvals"][0]["id"] == approval.id
 
 
-def test_render_dashboard_contains_main_sections(tmp_path):
+def test_render_dashboard_contains_main_sections_and_approval_review(tmp_path):
     create_project(
         root=tmp_path,
         name="Demo UI",
@@ -34,6 +43,13 @@ def test_render_dashboard_contains_main_sections(tmp_path):
         init_git=False,
         create_hooks=False,
     )
+    create_approval_request(
+        tmp_path,
+        action_type="shell",
+        title="Review action",
+        reason="Needs review.",
+        command="review-me",
+    )
 
     html = render_dashboard(tmp_path)
 
@@ -41,6 +57,10 @@ def test_render_dashboard_contains_main_sections(tmp_path):
     assert "Tasks" in html
     assert "Security" in html
     assert "Run logs" in html
+    assert "Approval review" in html
+    assert "Review action" in html
+    assert "Approve" in html
+    assert "Reject" in html
 
 
 def test_handler_get_status_returns_json(tmp_path):
@@ -59,6 +79,7 @@ def test_handler_get_status_returns_json(tmp_path):
     assert handler.status == HTTPStatus.OK.value
     payload = json.loads(handler.body.decode("utf-8"))
     assert payload["project"]["name"] == "Demo UI"
+    assert "approvals" in payload
 
 
 def test_handler_post_trust_redirects_and_writes_status(tmp_path):
@@ -77,6 +98,48 @@ def test_handler_post_trust_redirects_and_writes_status(tmp_path):
 
     assert handler.status == HTTPStatus.SEE_OTHER.value
     assert (tmp_path / ".cagent" / "trust.json").exists()
+
+
+def test_handler_post_approval_updates_status(tmp_path):
+    create_project(
+        root=tmp_path,
+        name="Demo UI",
+        project_type="software_project",
+        goal="Show state.",
+        init_git=False,
+        create_hooks=False,
+    )
+    approval = create_approval_request(
+        tmp_path,
+        action_type="shell",
+        title="Review action",
+        reason="Needs review.",
+        command="review-me",
+    )
+    body = urlencode({"id": approval.id, "action": "approved", "note": "ok"}).encode("utf-8")
+    handler = _make_handler(tmp_path, path="/actions/approval", method="POST", body=body)
+
+    handler.do_POST()
+
+    assert handler.status == HTTPStatus.SEE_OTHER.value
+    assert get_approval_request(tmp_path, approval.id).status == "approved"
+
+
+def test_handler_post_approval_rejects_invalid_action(tmp_path):
+    create_project(
+        root=tmp_path,
+        name="Demo UI",
+        project_type="software_project",
+        goal="Show state.",
+        init_git=False,
+        create_hooks=False,
+    )
+    body = urlencode({"id": "missing", "action": "unknown"}).encode("utf-8")
+    handler = _make_handler(tmp_path, path="/actions/approval", method="POST", body=body)
+
+    handler.do_POST()
+
+    assert handler.status == HTTPStatus.BAD_REQUEST.value
 
 
 def _make_handler(tmp_path, *, path="/api/status", method="GET", body=b""):
