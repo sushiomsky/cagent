@@ -30,6 +30,12 @@ This repo starts with a practical MVP instead of a framework-heavy architecture:
 - copy-paste friendly CLI
 - works with Ollama's OpenAI-compatible API
 
+## Documentation
+
+- [Client integration guide](docs/CLIENTS.md)
+- [Tesla T4 + Tailscale + Ollama deployment guide](docs/T4_TAILSCALE_OLLAMA.md)
+- [Roadmap](docs/ROADMAP.md)
+
 ## Recommended model profiles for a Tesla T4
 
 Use this as the default daily coding model:
@@ -83,6 +89,8 @@ If you already have a Tailscale/local proxy, keep your endpoint as:
 ```text
 http://127.0.0.1:18080/v1
 ```
+
+For the full worker setup, see [Tesla T4 + Tailscale + Ollama deployment guide](docs/T4_TAILSCALE_OLLAMA.md).
 
 ## Configure
 
@@ -153,6 +161,8 @@ cagent run \
   --goal "Add a small function and run the tests."
 ```
 
+For client-specific setup, see [Client integration guide](docs/CLIENTS.md).
+
 ## Agent tools
 
 The model can request these tools through the JSON action loop:
@@ -196,4 +206,5 @@ This is still a developer tool. Do not run it against production directories or 
 - [x] repo map and context packer
 - [x] model router: fast/default/reviewer
 - [x] approval and command profiles for shell actions
-- [ ] OpenWebUI/Codex integration docs
+- [x] client integration docs
+- [x] Tailscale/Ollama/T4 deployment guide
